@@ -8,13 +8,12 @@ datasource db {
 }
 
 model Branch {
-  id      String  @id @default(cuid())
-  name    String
-  code    String  @unique
-  address String?
-  phone   String?
-  email   String?
-
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  address  String?
+  phone    String?
+  email    String?
   isActive Boolean @default(true)
 
   users User[]
@@ -28,8 +27,8 @@ model Role {
   name        String  @unique
   description String?
 
-  users       User[]
-  permissions Permission[]
+  users           User[]
+  rolePermissions RolePermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -40,11 +39,20 @@ model Permission {
   name        String  @unique
   description String?
 
-  roleId String
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
 }
 
 model User {
@@ -62,12 +70,16 @@ model User {
   emailVerified Boolean @default(false)
   isActive      Boolean @default(true)
 
-  roleId   String
   branchId String
+  roleId   String
 
-  role   Role   @relation(fields: [roleId], references: [id])
   branch Branch @relation(fields: [branchId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([branchId])
+  @@index([roleId])
 }
