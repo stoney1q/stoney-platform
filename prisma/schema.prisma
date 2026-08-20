@@ -61,8 +61,8 @@ model User {
   firstName String
   lastName  String
 
-  email        String @unique
-  passwordHash String
+  email       String  @unique
+  firebaseUid String? @unique
 
   phone  String?
   avatar String?
@@ -80,6 +80,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([firebaseUid])
   @@index([branchId])
   @@index([roleId])
 }
