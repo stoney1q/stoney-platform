@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaClient } from '../src/generated/prisma/client';
-import bcrypt from 'bcryptjs';
 
 // Fail immediately if DATABASE_URL is missing — never fall back to an implicit connection.
 const databaseUrl = process.env['DATABASE_URL'];
@@ -535,57 +534,6 @@ async function main() {
   console.log(
     `Role permissions created/updated: ${totalRolePermissions} role-permission mappings verified`
   );
-
-  // 5. Initial Super Admin User (Environment-driven — never hardcoded)
-  // Configure via .env (never committed):
-  //   SEED_ADMIN_EMAIL=admin@example.com
-  //   SEED_ADMIN_PASSWORD=<min 8 chars>
-  //   SEED_ADMIN_FIRST_NAME=Super    (optional, defaults to "Super")
-  //   SEED_ADMIN_LAST_NAME=Admin     (optional, defaults to "Admin")
-  const adminEmail = process.env['SEED_ADMIN_EMAIL']?.trim();
-  const adminPassword = process.env['SEED_ADMIN_PASSWORD'];
-
-  if (adminEmail && adminPassword) {
-    if (adminPassword.length < 8) {
-      throw new Error('SEED_ADMIN_PASSWORD must be at least 8 characters long');
-    }
-
-    if (!superAdminRoleId) {
-      throw new Error('Super Admin role not found during admin user seed');
-    }
-
-    const passwordHash = await bcrypt.hash(adminPassword, 12);
-    const firstName = process.env['SEED_ADMIN_FIRST_NAME']?.trim() || 'Super';
-    const lastName = process.env['SEED_ADMIN_LAST_NAME']?.trim() || 'Admin';
-
-    await prisma.user.upsert({
-      where: { email: adminEmail },
-      update: {
-        firstName,
-        lastName,
-        passwordHash,
-        branchId: branch.id,
-        roleId: superAdminRoleId,
-        isActive: true,
-      },
-      create: {
-        firstName,
-        lastName,
-        email: adminEmail,
-        passwordHash,
-        branchId: branch.id,
-        roleId: superAdminRoleId,
-        emailVerified: true,
-        isActive: true,
-      },
-    });
-
-    console.log('Admin user created/updated: configured via environment');
-  } else {
-    console.log(
-      'Admin user creation skipped: SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set in environment'
-    );
-  }
 
   console.log('Database seed completed successfully');
 }
