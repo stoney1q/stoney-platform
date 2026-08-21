@@ -45,7 +45,7 @@ mock.module('../firebase/admin', {
 
 describe('Sales Foundation Actions', async () => {
   const { prisma } = await import('../prisma');
-  const { createSale, addSaleItem, removeSaleItem, applyPayment, cancelSale } =
+  const { createSale, addSaleItem, applyPayment, cancelSale } =
     await import('./actions');
 
   let mainBranchId: string;
