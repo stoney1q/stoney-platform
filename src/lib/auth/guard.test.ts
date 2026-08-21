@@ -106,6 +106,9 @@ describe('Authentication & Security', async () => {
       await prisma.transfer.deleteMany({
         where: { createdById: { in: userIds } },
       });
+      await prisma.customer.deleteMany({
+        where: { createdById: { in: userIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     }
 
@@ -161,6 +164,9 @@ describe('Authentication & Security', async () => {
         where: { userId: { in: userIds } },
       });
       await prisma.transfer.deleteMany({
+        where: { createdById: { in: userIds } },
+      });
+      await prisma.customer.deleteMany({
         where: { createdById: { in: userIds } },
       });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
