@@ -96,6 +96,7 @@ describe('Inventory Actions & Security', async () => {
     }
 
     // Clean users
+    await prisma.customer.deleteMany();
     await prisma.user.deleteMany({
       where: { email: { endsWith: '@test.local' } },
     });
