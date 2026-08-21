@@ -17,8 +17,8 @@ export function NewSaleForm({ customers }: { customers: Customer[] }) {
     try {
       const sale = await createSale(formData);
       router.push(`/sales/${sale.id}`);
-    } catch (e: any) {
-      setError(e.message || 'Failed to create sale');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to create sale');
       setIsPending(false);
     }
   }

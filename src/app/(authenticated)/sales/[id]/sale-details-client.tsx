@@ -17,13 +17,31 @@ import {
   applyPayment,
   cancelSale,
 } from '@/lib/sales/actions';
+import {
+  Customer,
+  Sale,
+  SaleItem,
+  Payment,
+  Product,
+  BranchStock,
+} from '@/generated/prisma/client';
+
+type SaleWithRelations = Sale & {
+  customer: Customer;
+  items: SaleItem[];
+  payments: Payment[];
+};
+
+type ProductWithStock = Product & {
+  branchStocks: BranchStock[];
+};
 
 export function SaleDetailsClient({
   sale,
   availableProducts,
 }: {
-  sale: any;
-  availableProducts: any[];
+  sale: SaleWithRelations;
+  availableProducts: ProductWithStock[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +54,8 @@ export function SaleDetailsClient({
     try {
       await addSaleItem(formData);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message || 'Failed to add item');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to add item');
     } finally {
       setIsPending(false);
     }
@@ -53,8 +71,8 @@ export function SaleDetailsClient({
     try {
       await removeSaleItem(formData);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message || 'Failed to remove item');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to remove item');
     } finally {
       setIsPending(false);
     }
@@ -67,8 +85,8 @@ export function SaleDetailsClient({
     try {
       await applyPayment(formData);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message || 'Failed to apply payment');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to apply payment');
     } finally {
       setIsPending(false);
     }
@@ -83,15 +101,15 @@ export function SaleDetailsClient({
     try {
       await cancelSale(formData);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message || 'Failed to cancel sale');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to cancel sale');
     } finally {
       setIsPending(false);
     }
   }
 
   const amountPaid = sale.payments.reduce(
-    (sum: number, p: any) => sum + Number(p.amount),
+    (sum: number, p: Payment) => sum + Number(p.amount),
     0
   );
   const remaining = Number(sale.total) - amountPaid;
@@ -229,7 +247,7 @@ export function SaleDetailsClient({
                   </TableCell>
                 </TableRow>
               ) : (
-                sale.items.map((item: any) => (
+                sale.items.map((item: SaleItem) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.sku}</TableCell>
                     <TableCell className="font-medium">
@@ -336,7 +354,7 @@ export function SaleDetailsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sale.payments.map((p: any) => (
+                {sale.payments.map((p: Payment) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       {new Date(p.createdAt).toLocaleString()}

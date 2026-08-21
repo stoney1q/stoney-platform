@@ -16,10 +16,9 @@ import {
 import {
   Prisma,
   SaleStatus,
-  PaymentMethod,
   MovementType,
+  PaymentMethod,
 } from '@/generated/prisma/client';
-import { z } from 'zod';
 
 export async function searchSales(options: {
   query?: string;
@@ -75,7 +74,7 @@ export async function searchSales(options: {
 }
 
 export async function getSale(id: string) {
-  const session = await requireAuth();
+  await requireAuth();
   await requirePermission('sales:read');
 
   const sale = await prisma.sale.findUnique({
@@ -120,7 +119,8 @@ function calculateSaleTotals(
 }
 
 export async function createSale(formData: FormData) {
-  const session = await requirePermission('sales:create');
+  const session = await requireAuth();
+  await requirePermission('sales:create');
 
   const rawData = {
     customerId: formData.get('customerId') as string,
@@ -145,7 +145,7 @@ export async function createSale(formData: FormData) {
 }
 
 export async function addSaleItem(formData: FormData) {
-  const session = await requirePermission('sales:create');
+  await requirePermission('sales:create');
 
   const rawData = {
     saleId: formData.get('saleId') as string,
@@ -221,7 +221,7 @@ export async function addSaleItem(formData: FormData) {
 }
 
 export async function removeSaleItem(formData: FormData) {
-  const session = await requirePermission('sales:create');
+  await requirePermission('sales:create');
 
   const rawData = {
     saleId: formData.get('saleId') as string,
@@ -356,7 +356,7 @@ export async function applyPayment(formData: FormData) {
 }
 
 export async function cancelSale(formData: FormData) {
-  const session = await requirePermission('sales:cancel');
+  await requirePermission('sales:delete');
 
   const data = cancelSaleSchema.parse({
     saleId: formData.get('saleId'),
