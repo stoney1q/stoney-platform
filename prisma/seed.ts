@@ -145,23 +145,22 @@ const FOUNDATIONAL_PERMISSIONS: PermissionDefinition[] = [
     description: 'Archive or delete catalog products',
   },
 
-  // Inventory
   {
     name: 'inventory:read',
     description:
       'View stock levels, warehouse allocations, and movement history',
   },
   {
-    name: 'inventory:create',
-    description: 'Create stock items and initial inventory records',
+    name: 'inventory:write',
+    description: 'Create and adjust inventory records and perform receipts',
   },
   {
-    name: 'inventory:update',
-    description: 'Update inventory details and reorder thresholds',
+    name: 'transfers:read',
+    description: 'View inter-branch transfer requests and history',
   },
   {
-    name: 'inventory:adjust',
-    description: 'Perform stock adjustments, counts, transfers, and write-offs',
+    name: 'transfers:write',
+    description: 'Create, dispatch, receive, and cancel branch transfers',
   },
 
   // Customers
@@ -298,9 +297,9 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'products:update',
     'products:delete',
     'inventory:read',
-    'inventory:create',
-    'inventory:update',
-    'inventory:adjust',
+    'inventory:write',
+    'transfers:read',
+    'transfers:write',
     'customers:read',
     'customers:create',
     'customers:update',
@@ -336,8 +335,9 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'products:create',
     'products:update',
     'inventory:read',
-    'inventory:update',
-    'inventory:adjust',
+    'inventory:write',
+    'transfers:read',
+    'transfers:write',
     'customers:read',
     'customers:create',
     'customers:update',
@@ -402,9 +402,9 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'products:create',
     'products:update',
     'inventory:read',
-    'inventory:create',
-    'inventory:update',
-    'inventory:adjust',
+    'inventory:write',
+    'transfers:read',
+    'transfers:write',
     'suppliers:read',
     'suppliers:create',
     'suppliers:update',

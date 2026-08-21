@@ -7,6 +7,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// ==========================================
+// AUTHENTICATION & FOUNDATION
+// ==========================================
+
 model Branch {
   id       String  @id @default(cuid())
   name     String
@@ -16,7 +20,11 @@ model Branch {
   email    String?
   isActive Boolean @default(true)
 
-  users User[]
+  users                User[]
+  branchStocks         BranchStock[]
+  stockMovements       StockMovement[]
+  transfersOrigin      Transfer[] @relation("TransferOrigin")
+  transfersDestination Transfer[] @relation("TransferDest")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -75,6 +83,9 @@ model User {
 
   branch Branch @relation(fields: [branchId], references: [id])
   role   Role   @relation(fields: [roleId], references: [id])
+  
+  stockMovements   StockMovement[]
+  transfersCreated Transfer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -83,4 +94,128 @@ model User {
   @@index([firebaseUid])
   @@index([branchId])
   @@index([roleId])
+}
+
+
+// ==========================================
+// INVENTORY DOMAIN
+// ==========================================
+
+enum MovementType {
+  RECEIPT
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  SALE
+  REPAIR_CONSUMPTION
+  RETURN
+}
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+model Product {
+  id              String            @id @default(cuid())
+  sku             String            @unique
+  name            String
+  description     String?
+  
+  branchStocks    BranchStock[]
+  movements       StockMovement[]
+  suppliers       ProductSupplier[]
+  transfers       Transfer[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Supplier {
+  id              String            @id @default(cuid())
+  name            String
+  contactName     String?
+  email           String?
+  phone           String?
+  
+  products        ProductSupplier[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ProductSupplier {
+  id              String   @id @default(cuid())
+  productId       String
+  supplierId      String
+  supplierSku     String?
+  unitCost        Decimal  @db.Decimal(10, 2)
+  isPreferred     Boolean  @default(false)
+  
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([productId, supplierId])
+}
+
+model BranchStock {
+  id              String   @id @default(cuid())
+  branchId        String
+  productId       String
+  onHand          Int      @default(0)
+  reserved        Int      @default(0)
+  reorderLevel    Int      @default(0)
+  
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([branchId, productId])
+}
+
+model StockMovement {
+  id              String       @id @default(cuid())
+  branchId        String
+  productId       String
+  quantity        Int
+  type            MovementType
+  referenceId     String?
+  reason          String?
+  userId          String
+  
+  branch          Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product         Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime     @default(now())
+
+  @@index([branchId, productId, createdAt])
+}
+
+model Transfer {
+  id              String         @id @default(cuid())
+  originId        String
+  destinationId   String
+  productId       String
+  quantity        Int
+  status          TransferStatus @default(PENDING)
+  createdById     String
+  
+  origin          Branch         @relation("TransferOrigin", fields: [originId], references: [id])
+  destination     Branch         @relation("TransferDest", fields: [destinationId], references: [id])
+  product         Product        @relation(fields: [productId], references: [id])
+  createdBy       User           @relation(fields: [createdById], references: [id])
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([originId, status])
+  @@index([destinationId, status])
 }
