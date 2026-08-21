@@ -95,9 +95,19 @@ describe('Authentication & Security', async () => {
     }
 
     // Ensure we don't conflict with existing data by cleaning up any left-over test users
-    await prisma.user.deleteMany({
+    const usersToDelete = await prisma.user.findMany({
       where: { email: { endsWith: '@test.local' } },
     });
+    if (usersToDelete.length > 0) {
+      const userIds = usersToDelete.map((u) => u.id);
+      await prisma.stockMovement.deleteMany({
+        where: { userId: { in: userIds } },
+      });
+      await prisma.transfer.deleteMany({
+        where: { createdById: { in: userIds } },
+      });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    }
 
     // 2. Create test users
     activeUser = await prisma.user.create({
@@ -142,9 +152,19 @@ describe('Authentication & Security', async () => {
 
   after(async () => {
     // Cleanup
-    await prisma.user.deleteMany({
+    const usersToDelete = await prisma.user.findMany({
       where: { email: { endsWith: '@test.local' } },
     });
+    if (usersToDelete.length > 0) {
+      const userIds = usersToDelete.map((u) => u.id);
+      await prisma.stockMovement.deleteMany({
+        where: { userId: { in: userIds } },
+      });
+      await prisma.transfer.deleteMany({
+        where: { createdById: { in: userIds } },
+      });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    }
     await prisma.branch.deleteMany({ where: { code: 'OTHER' } });
     await prisma.$disconnect();
   });
