@@ -6,7 +6,11 @@ import {
   requireBranchAccess,
   requirePermission,
 } from '../auth/guard';
-import { MovementType, TransferStatus } from '../../generated/prisma/client';
+import {
+  MovementType,
+  TransferStatus,
+  ProductType,
+} from '../../generated/prisma/client';
 
 /**
  * Validates product SKU uniqueness
@@ -15,6 +19,8 @@ export async function createProduct(data: {
   sku: string;
   name: string;
   description?: string;
+  sellingPrice?: number;
+  type?: ProductType;
 }) {
   await requirePermission('inventory:write');
 

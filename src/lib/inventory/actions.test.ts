@@ -1,41 +1,37 @@
-import { describe, it, before, after, mock } from 'node:test';
+import { describe, it, beforeAll, afterAll, vi } from 'vitest';
 import assert from 'node:assert';
 import 'dotenv/config';
 
 // Mock cookies based on a simple global state we can change per test
-let currentMockCookie: string | undefined = undefined;
+const { currentMockCookie } = vi.hoisted(() => ({
+  currentMockCookie: { value: undefined as string | undefined },
+}));
 
-mock.module('next/headers', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    cookies: async () => ({
-      get: (name: string) => {
-        if (name === 'stoney_session' && currentMockCookie !== undefined) {
-          return { value: currentMockCookie };
-        }
-        return undefined;
-      },
-    }),
-  },
-});
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      if (name === 'stoney_session' && currentMockCookie.value !== undefined) {
+        return { value: currentMockCookie.value };
+      }
+      return undefined;
+    },
+  }),
+}));
 
-mock.module('../firebase/admin', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    isFirebaseAdminConfigured: () => true,
-    getFirebaseAdminAuth: () => ({
-      verifySessionCookie: async () => {
-        if (currentMockCookie === 'active_hq_user') {
-          return { uid: 'hq_uid', email: 'hq@test.local' };
-        }
-        if (currentMockCookie === 'active_other_user') {
-          return { uid: 'other_uid', email: 'other@test.local' };
-        }
-        throw new Error('auth/invalid-session-cookie');
-      },
-    }),
-  },
-});
+vi.mock('../firebase/admin', () => ({
+  isFirebaseAdminConfigured: () => true,
+  getFirebaseAdminAuth: () => ({
+    verifySessionCookie: async () => {
+      if (currentMockCookie.value === 'active_hq_user') {
+        return { uid: 'hq_uid', email: 'hq@test.local' };
+      }
+      if (currentMockCookie.value === 'active_other_user') {
+        return { uid: 'other_uid', email: 'other@test.local' };
+      }
+      throw new Error('auth/invalid-session-cookie');
+    },
+  }),
+}));
 
 describe('Inventory Actions & Security', async () => {
   const prisma = (await import('../prisma')).default;
@@ -52,7 +48,7 @@ describe('Inventory Actions & Security', async () => {
   let branchOther: { id: string };
   let productA: { id: string };
 
-  before(async () => {
+  beforeAll(async () => {
     // 1. Setup branches
     branchHQ = await prisma.branch.upsert({
       where: { code: 'HQ' },
@@ -139,7 +135,7 @@ describe('Inventory Actions & Security', async () => {
     await prisma.branchStock.deleteMany({});
   });
 
-  after(async () => {
+  afterAll(async () => {
     // Cleanup
     await prisma.stockMovement.deleteMany({});
     await prisma.transfer.deleteMany({});
@@ -153,7 +149,7 @@ describe('Inventory Actions & Security', async () => {
 
   describe('receiveStock', () => {
     it('creates branch stock and movement', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const stock = await receiveStock(
         branchHQ.id,
         productA.id,
@@ -171,7 +167,7 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('rejects access for wrong branch', async () => {
-      currentMockCookie = 'active_other_user';
+      currentMockCookie.value = 'active_other_user';
       await assert.rejects(
         receiveStock(branchHQ.id, productA.id, 10),
         (err: Error) => err.message.includes('Access denied')
@@ -181,7 +177,7 @@ describe('Inventory Actions & Security', async () => {
 
   describe('adjustStock', () => {
     it('allows positive adjustment', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const stock = await adjustStock(
         branchHQ.id,
         productA.id,
@@ -193,14 +189,14 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('allows negative adjustment when sufficient stock', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const stock = await adjustStock(branchHQ.id, productA.id, -20, 'Damaged');
       assert.ok(stock);
       assert.strictEqual(stock.onHand, 40);
     });
 
     it('rejects negative adjustment when insufficient stock', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       await assert.rejects(
         adjustStock(branchHQ.id, productA.id, -100, 'Too much'),
         (err: Error) => err.message.includes('Insufficient available stock')
@@ -208,7 +204,7 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('prevents negative stock under concurrent consumption', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
 
       // Get current stock, should be 40
       const current = await prisma.branchStock.findUnique({
@@ -264,7 +260,7 @@ describe('Inventory Actions & Security', async () => {
     let transferId: string;
 
     it('creates a transfer request', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const transfer = await createTransfer(
         branchHQ.id,
         branchOther.id,
@@ -276,7 +272,7 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('dispatches a transfer (decrements origin)', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const transfer = await dispatchTransfer(transferId);
       assert.strictEqual(transfer.status, 'IN_TRANSIT');
 
@@ -290,7 +286,7 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('receives a transfer (increments destination)', async () => {
-      currentMockCookie = 'active_other_user';
+      currentMockCookie.value = 'active_other_user';
       const transfer = await receiveTransfer(transferId);
       assert.strictEqual(transfer.status, 'COMPLETED');
 
@@ -307,7 +303,7 @@ describe('Inventory Actions & Security', async () => {
     });
 
     it('cancels a transfer safely', async () => {
-      currentMockCookie = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_user';
       const t = await createTransfer(
         branchHQ.id,
         branchOther.id,

@@ -18,7 +18,13 @@ import {
   SaleStatus,
   MovementType,
   PaymentMethod,
+  ProductType,
 } from '@/generated/prisma/client';
+import {
+  calculateDocumentSubtotal,
+  calculateLineTotal,
+  calculateLineSubtotal,
+} from '@/lib/pricing/math';
 
 export async function searchSales(options: {
   query?: string;
@@ -100,21 +106,18 @@ export async function getSale(id: string) {
 }
 
 function calculateSaleTotals(
-  items: {
-    subtotal: Prisma.Decimal;
-    discount: Prisma.Decimal;
-    total: Prisma.Decimal;
-  }[],
+  items: { total: Prisma.Decimal }[],
   saleDiscount: Prisma.Decimal
 ) {
-  const subtotal = items.reduce(
-    (sum, item) => sum.add(item.total),
-    new Prisma.Decimal(0)
+  const subtotal = new Prisma.Decimal(
+    calculateDocumentSubtotal(items).toString()
   );
-  const total = subtotal.sub(saleDiscount);
+  const total = new Prisma.Decimal(
+    calculateLineTotal(subtotal, saleDiscount).toString()
+  );
   return {
     subtotal,
-    total: total.isNegative() ? new Prisma.Decimal(0) : total,
+    total,
   };
 }
 
@@ -176,15 +179,17 @@ export async function addSaleItem(formData: FormData) {
 
     // 3. Exact decimal calculations
     const unitPrice = product.sellingPrice;
-    const quantity = new Prisma.Decimal(data.quantity);
     const itemDiscount = new Prisma.Decimal(data.discount);
 
-    const lineSubtotal = unitPrice.mul(quantity);
-    let lineTotal = lineSubtotal.sub(itemDiscount);
-
-    if (lineTotal.isNegative()) {
-      lineTotal = new Prisma.Decimal(0);
-    }
+    const lineSubtotal = new Prisma.Decimal(
+      calculateLineSubtotal(unitPrice.toString(), data.quantity).toString()
+    );
+    const lineTotal = new Prisma.Decimal(
+      calculateLineTotal(
+        lineSubtotal.toString(),
+        itemDiscount.toString()
+      ).toString()
+    );
 
     // 4. Create immutable SaleItem snapshot
     await tx.saleItem.create({
@@ -193,6 +198,7 @@ export async function addSaleItem(formData: FormData) {
         productId: product.id,
         sku: product.sku,
         productName: product.name,
+        productType: product.type,
         quantity: data.quantity,
         unitPrice: unitPrice,
         discount: itemDiscount,
@@ -305,32 +311,36 @@ export async function applyPayment(formData: FormData) {
     // If this payment fully pays the sale, perform the atomic inventory consumption
     if (isFinalPayment) {
       for (const item of sale.items) {
-        // Raw SQL conditional inventory update
-        const result = await tx.$executeRaw`
-          UPDATE "BranchStock"
-          SET "onHand" = "onHand" - ${item.quantity},
-              "updatedAt" = NOW()
-          WHERE "branchId" = ${sale.branchId}
-            AND "productId" = ${item.productId}
-            AND ("onHand" - "reserved") >= ${item.quantity}
-        `;
+        if (item.productType === ProductType.GOODS) {
+          // Raw SQL conditional inventory update
+          const result = await tx.$executeRaw`
+            UPDATE "BranchStock"
+            SET "onHand" = "onHand" - ${item.quantity},
+                "updatedAt" = NOW()
+            WHERE "branchId" = ${sale.branchId}
+              AND "productId" = ${item.productId}
+              AND ("onHand" - "reserved") >= ${item.quantity}
+          `;
 
-        if (result === 0) {
-          throw new Error(`Insufficient stock for product ${item.productName}`);
+          if (result === 0) {
+            throw new Error(
+              `Insufficient stock for product ${item.productName}`
+            );
+          }
+
+          // Create StockMovement(SALE)
+          await tx.stockMovement.create({
+            data: {
+              branchId: sale.branchId,
+              productId: item.productId,
+              quantity: -item.quantity,
+              type: MovementType.SALE,
+              referenceId: sale.id,
+              reason: 'Sale completed',
+              userId: session.id,
+            },
+          });
         }
-
-        // Create StockMovement(SALE)
-        await tx.stockMovement.create({
-          data: {
-            branchId: sale.branchId,
-            productId: item.productId,
-            quantity: -item.quantity,
-            type: MovementType.SALE,
-            referenceId: sale.id,
-            reason: 'Sale completed',
-            userId: session.id,
-          },
-        });
       }
 
       await tx.sale.update({
