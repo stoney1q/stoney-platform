@@ -175,7 +175,8 @@ export async function getCurrentUser(
       },
       permissions: Array.from(new Set(permissions)),
     };
-  } catch {
+  } catch (error) {
+    console.error('getCurrentUser Error:', error);
     return null;
   }
 }

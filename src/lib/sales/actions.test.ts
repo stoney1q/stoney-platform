@@ -1,4 +1,4 @@
-import { describe, it, before, after, beforeEach, mock } from 'node:test';
+import { describe, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import * as assert from 'node:assert';
 // Prisma types can be imported statically
 import {
@@ -9,39 +9,35 @@ import {
 } from '@/generated/prisma/client';
 
 // Mock cookies based on a simple global state we can change per test
-let currentMockCookie: string | undefined = undefined;
+const { currentMockCookie } = vi.hoisted(() => ({
+  currentMockCookie: { value: undefined as string | undefined },
+}));
 
-mock.module('next/headers', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    cookies: async () => ({
-      get: (name: string) => {
-        if (name === 'stoney_session' && currentMockCookie !== undefined) {
-          return { value: currentMockCookie };
-        }
-        return undefined;
-      },
-    }),
-  },
-});
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      if (name === 'stoney_session' && currentMockCookie.value !== undefined) {
+        return { value: currentMockCookie.value };
+      }
+      return undefined;
+    },
+  }),
+}));
 
-mock.module('../firebase/admin', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    isFirebaseAdminConfigured: () => true,
-    getFirebaseAdminAuth: () => ({
-      verifySessionCookie: async () => {
-        if (currentMockCookie === 'active_cashier') {
-          return { uid: 'cashier_uid', email: 'cashier@test.com' };
-        }
-        if (currentMockCookie === 'active_other') {
-          return { uid: 'other_uid', email: 'other@test.com' };
-        }
-        throw new Error('auth/invalid-session-cookie');
-      },
-    }),
-  },
-});
+vi.mock('../firebase/admin', () => ({
+  isFirebaseAdminConfigured: () => true,
+  getFirebaseAdminAuth: () => ({
+    verifySessionCookie: async () => {
+      if (currentMockCookie.value === 'active_cashier') {
+        return { uid: 'cashier_uid', email: 'cashier@test.com' };
+      }
+      if (currentMockCookie.value === 'active_other') {
+        return { uid: 'other_uid', email: 'other@test.com' };
+      }
+      throw new Error('auth/invalid-session-cookie');
+    },
+  }),
+}));
 
 describe('Sales Foundation Actions', async () => {
   const { prisma } = await import('../prisma');
@@ -56,7 +52,7 @@ describe('Sales Foundation Actions', async () => {
   let product1Id: string;
   let product2Id: string;
 
-  before(async () => {
+  beforeAll(async () => {
     // Setup test data
     const branch1 = await prisma.branch.upsert({
       where: { code: 'TB1' },
@@ -118,7 +114,7 @@ describe('Sales Foundation Actions', async () => {
     });
     otherUserId = otherUser.id;
 
-    const perms = ['sales:create', 'payments:create', 'sales:cancel'];
+    const perms = ['sales:create', 'payments:create', 'sales:delete'];
     for (const p of perms) {
       const perm = await prisma.permission.upsert({
         where: { name: p },
@@ -189,7 +185,7 @@ describe('Sales Foundation Actions', async () => {
     });
   });
 
-  after(async () => {
+  afterAll(async () => {
     // Cleanup
     await prisma.stockMovement.deleteMany({
       where: { branchId: { in: [mainBranchId, otherBranchId] } },
@@ -220,7 +216,7 @@ describe('Sales Foundation Actions', async () => {
   });
 
   beforeEach(() => {
-    currentMockCookie = 'active_cashier';
+    currentMockCookie.value = 'active_cashier';
   });
 
   it('creates a sale securely', async () => {
@@ -538,7 +534,7 @@ describe('Sales Foundation Actions', async () => {
   });
 
   it('enforces branch isolation', async () => {
-    currentMockCookie = 'active_other';
+    currentMockCookie.value = 'active_other';
 
     const sale = await prisma.sale.create({
       data: {

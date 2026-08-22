@@ -23,12 +23,13 @@ model Branch {
   users                User[]
   branchStocks         BranchStock[]
   stockMovements       StockMovement[]
-  transfersOrigin      Transfer[] @relation("TransferOrigin")
-  transfersDestination Transfer[] @relation("TransferDest")
+  transfersOrigin      Transfer[]      @relation("TransferOrigin")
+  transfersDestination Transfer[]      @relation("TransferDest")
   sales                Sale[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  quotations Quotation[]
 }
 
 model Role {
@@ -84,22 +85,22 @@ model User {
 
   branch Branch @relation(fields: [branchId], references: [id])
   role   Role   @relation(fields: [roleId], references: [id])
-  
+
   stockMovements   StockMovement[]
   transfersCreated Transfer[]
   customersCreated Customer[]
   salesCreated     Sale[]
   paymentsCreated  Payment[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  quotations Quotation[]
 
   @@index([email])
   @@index([firebaseUid])
   @@index([branchId])
   @@index([roleId])
 }
-
 
 // ==========================================
 // INVENTORY DOMAIN
@@ -115,6 +116,11 @@ enum MovementType {
   RETURN
 }
 
+enum ProductType {
+  GOODS
+  SERVICE
+}
+
 enum TransferStatus {
   PENDING
   IN_TRANSIT
@@ -123,104 +129,106 @@ enum TransferStatus {
 }
 
 model Product {
-  id              String            @id @default(cuid())
-  sku             String            @unique
-  name            String
-  description     String?
-  sellingPrice    Decimal           @default(0) @db.Decimal(10, 2)
-  
-  branchStocks    BranchStock[]
-  saleItems       SaleItem[]
-  movements       StockMovement[]
-  suppliers       ProductSupplier[]
-  transfers       Transfer[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String      @id @default(cuid())
+  sku          String      @unique
+  name         String
+  description  String?
+  type         ProductType @default(GOODS)
+  sellingPrice Decimal     @default(0) @db.Decimal(10, 2)
+
+  branchStocks BranchStock[]
+  saleItems    SaleItem[]
+  movements    StockMovement[]
+  suppliers    ProductSupplier[]
+  transfers    Transfer[]
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  quotationItems QuotationItem[]
 }
 
 model Supplier {
-  id              String            @id @default(cuid())
-  name            String
-  contactName     String?
-  email           String?
-  phone           String?
-  
-  products        ProductSupplier[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String  @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+
+  products ProductSupplier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ProductSupplier {
-  id              String   @id @default(cuid())
-  productId       String
-  supplierId      String
-  supplierSku     String?
-  unitCost        Decimal  @db.Decimal(10, 2)
-  isPreferred     Boolean  @default(false)
-  
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String  @id @default(cuid())
+  productId   String
+  supplierId  String
+  supplierSku String?
+  unitCost    Decimal @db.Decimal(10, 2)
+  isPreferred Boolean @default(false)
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([productId, supplierId])
 }
 
 model BranchStock {
-  id              String   @id @default(cuid())
-  branchId        String
-  productId       String
-  onHand          Int      @default(0)
-  reserved        Int      @default(0)
-  reorderLevel    Int      @default(0)
-  
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String @id @default(cuid())
+  branchId     String
+  productId    String
+  onHand       Int    @default(0)
+  reserved     Int    @default(0)
+  reorderLevel Int    @default(0)
+
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([branchId, productId])
 }
 
 model StockMovement {
-  id              String       @id @default(cuid())
-  branchId        String
-  productId       String
-  quantity        Int
-  type            MovementType
-  referenceId     String?
-  reason          String?
-  userId          String
-  
-  branch          Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  product         Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user            User         @relation(fields: [userId], references: [id])
-  
-  createdAt       DateTime     @default(now())
+  id          String       @id @default(cuid())
+  branchId    String
+  productId   String
+  quantity    Int
+  type        MovementType
+  referenceId String?
+  reason      String?
+  userId      String
+
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
 
   @@index([branchId, productId, createdAt])
 }
 
 model Transfer {
-  id              String         @id @default(cuid())
-  originId        String
-  destinationId   String
-  productId       String
-  quantity        Int
-  status          TransferStatus @default(PENDING)
-  createdById     String
-  
-  origin          Branch         @relation("TransferOrigin", fields: [originId], references: [id])
-  destination     Branch         @relation("TransferDest", fields: [destinationId], references: [id])
-  product         Product        @relation(fields: [productId], references: [id])
-  createdBy       User           @relation(fields: [createdById], references: [id])
-  
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  originId      String
+  destinationId String
+  productId     String
+  quantity      Int
+  status        TransferStatus @default(PENDING)
+  createdById   String
+
+  origin      Branch  @relation("TransferOrigin", fields: [originId], references: [id])
+  destination Branch  @relation("TransferDest", fields: [destinationId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+  createdBy   User    @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([originId, status])
   @@index([destinationId, status])
@@ -231,23 +239,24 @@ model Transfer {
 // ==========================================
 
 model Customer {
-  id              String   @id @default(cuid())
-  sequence        Int      @default(autoincrement()) @unique
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String?
-  alternatePhone  String?
-  address         String?
-  isActive        Boolean  @default(true)
-  
-  createdById     String
-  createdBy       User     @relation(fields: [createdById], references: [id])
-  
-  sales           Sale[]
+  id             String  @id @default(cuid())
+  sequence       Int     @unique @default(autoincrement())
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  alternatePhone String?
+  address        String?
+  isActive       Boolean @default(true)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  sales Sale[]
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  quotations Quotation[]
 
   @@index([lastName, firstName])
   @@index([phone])
@@ -272,29 +281,32 @@ enum PaymentMethod {
 }
 
 model Sale {
-  id          String     @id @default(cuid())
-  sequence    Int        @default(autoincrement()) @unique
-  status      SaleStatus @default(PENDING)
-  
+  id       String     @id @default(cuid())
+  sequence Int        @unique @default(autoincrement())
+  status   SaleStatus @default(PENDING)
+
   branchId    String
   customerId  String
   createdById String
 
-  discount    Decimal    @default(0) @db.Decimal(10, 2)
-  subtotal    Decimal    @default(0) @db.Decimal(10, 2)
-  total       Decimal    @default(0) @db.Decimal(10, 2)
-  
-  items       SaleItem[]
-  payments    Payment[]
-  
-  branch      Branch     @relation(fields: [branchId], references: [id])
-  customer    Customer   @relation(fields: [customerId], references: [id])
-  createdBy   User       @relation(fields: [createdById], references: [id])
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
+
+  quotationId String?    @unique
+
+  items    SaleItem[]
+  payments Payment[]
+
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  customer  Customer   @relation(fields: [customerId], references: [id])
+  createdBy User       @relation(fields: [createdById], references: [id])
+  quotation Quotation? @relation(fields: [quotationId], references: [id])
 
   completedAt DateTime?
   cancelledAt DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([branchId, createdAt])
   @@index([branchId, status, createdAt])
@@ -302,35 +314,96 @@ model Sale {
 }
 
 model SaleItem {
-  id          String  @id @default(cuid())
-  saleId      String
-  productId   String
-  
+  id        String @id @default(cuid())
+  saleId    String
+  productId String
+
   sku         String
   productName String
-  
-  quantity    Int
-  unitPrice   Decimal @db.Decimal(10, 2)
-  discount    Decimal @default(0) @db.Decimal(10, 2)
-  subtotal    Decimal @db.Decimal(10, 2)
-  total       Decimal @db.Decimal(10, 2)
+  productType ProductType @default(GOODS)
 
-  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product     Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 }
 
 model Payment {
-  id          String        @id @default(cuid())
-  saleId      String
-  amount      Decimal       @db.Decimal(10, 2)
-  method      PaymentMethod
-  reference   String?
-  
+  id        String        @id @default(cuid())
+  saleId    String
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod
+  reference String?
+
   createdById String
 
-  sale        Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  createdBy   User          @relation(fields: [createdById], references: [id])
-  
-  createdAt   DateTime      @default(now())
+  sale      Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
+// ==========================================
+// QUOTATIONS DOMAIN
+// ==========================================
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model Quotation {
+  id       String          @id @default(cuid())
+  sequence Int             @unique @default(autoincrement())
+  status   QuotationStatus @default(DRAFT)
+
+  branchId    String
+  customerId  String
+  createdById String
+
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
+
+  items QuotationItem[]
+
+  sale Sale?
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([branchId, status])
+  @@index([customerId])
+}
+
+model QuotationItem {
+  id          String @id @default(cuid())
+  quotationId String
+  productId   String
+
+  sku         String
+  productName String
+  productType ProductType @default(GOODS)
+
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+}

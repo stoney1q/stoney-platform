@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { ProductFormDialog } from './product-form';
 
 export default async function ProductsPage() {
   await requirePermission('inventory:read');
@@ -26,7 +27,7 @@ export default async function ProductsPage() {
             Manage the product catalog and SKUs.
           </p>
         </div>
-        <Button>Add Product</Button>
+        <ProductFormDialog />
       </div>
 
       <div className="rounded-md border">
@@ -34,7 +35,9 @@ export default async function ProductsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>SKU</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Price</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -43,7 +46,7 @@ export default async function ProductsPage() {
             {products.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={6}
                   className="text-muted-foreground text-center"
                 >
                   No products found.
@@ -53,7 +56,15 @@ export default async function ProductsPage() {
               products.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.sku}</TableCell>
+                  <TableCell>
+                    <span className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-800">
+                      {product.type}
+                    </span>
+                  </TableCell>
                   <TableCell>{product.name}</TableCell>
+                  <TableCell>
+                    ${Number(product.sellingPrice).toFixed(2)}
+                  </TableCell>
                   <TableCell>
                     {product.createdAt.toLocaleDateString()}
                   </TableCell>

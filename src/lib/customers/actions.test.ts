@@ -1,40 +1,36 @@
-import { describe, it, before, after, mock } from 'node:test';
+import { describe, it, beforeAll, afterAll, vi } from 'vitest';
 import assert from 'node:assert';
 import 'dotenv/config';
 
-let currentMockCookie: string | undefined = undefined;
+const { currentMockCookie } = vi.hoisted(() => ({
+  currentMockCookie: { value: undefined as string | undefined },
+}));
 
-mock.module('next/headers', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    cookies: async () => ({
-      get: (name: string) => {
-        if (name === 'stoney_session' && currentMockCookie !== undefined) {
-          return { value: currentMockCookie };
-        }
-        return undefined;
-      },
-    }),
-  },
-});
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      if (name === 'stoney_session' && currentMockCookie.value !== undefined) {
+        return { value: currentMockCookie.value };
+      }
+      return undefined;
+    },
+  }),
+}));
 
-mock.module('../firebase/admin', {
-  // @ts-expect-error MockModuleOptions
-  exports: {
-    isFirebaseAdminConfigured: () => true,
-    getFirebaseAdminAuth: () => ({
-      verifySessionCookie: async () => {
-        if (currentMockCookie === 'active_admin') {
-          return { uid: 'admin_uid', email: 'admin@test.local' };
-        }
-        if (currentMockCookie === 'active_unauth') {
-          return { uid: 'unauth_uid', email: 'unauth@test.local' };
-        }
-        throw new Error('auth/invalid-session-cookie');
-      },
-    }),
-  },
-});
+vi.mock('../firebase/admin', () => ({
+  isFirebaseAdminConfigured: () => true,
+  getFirebaseAdminAuth: () => ({
+    verifySessionCookie: async () => {
+      if (currentMockCookie.value === 'active_admin') {
+        return { uid: 'admin_uid', email: 'admin@test.local' };
+      }
+      if (currentMockCookie.value === 'active_unauth') {
+        return { uid: 'unauth_uid', email: 'unauth@test.local' };
+      }
+      throw new Error('auth/invalid-session-cookie');
+    },
+  }),
+}));
 
 describe('Customer Actions', async () => {
   const { prisma } = await import('@/lib/prisma');
@@ -48,7 +44,7 @@ describe('Customer Actions', async () => {
 
   let adminUserId: string;
 
-  before(async () => {
+  beforeAll(async () => {
     const permissionKeys = [
       'customers:read',
       'customers:create',
@@ -106,7 +102,7 @@ describe('Customer Actions', async () => {
     });
   });
 
-  after(async () => {
+  afterAll(async () => {
     await prisma.customer.deleteMany({});
     await prisma.user.deleteMany({
       where: { firebaseUid: { in: ['admin_uid', 'unauth_uid'] } },
@@ -119,7 +115,7 @@ describe('Customer Actions', async () => {
   });
 
   it('1. Valid customer creation', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Alice',
       lastName: 'Smith',
@@ -135,7 +131,7 @@ describe('Customer Actions', async () => {
   });
 
   it('2. Missing first name rejected', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: '',
       lastName: 'Smith',
@@ -150,7 +146,7 @@ describe('Customer Actions', async () => {
   });
 
   it('3. Missing last name rejected', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Bob',
       lastName: '',
@@ -165,7 +161,7 @@ describe('Customer Actions', async () => {
   });
 
   it('4. Missing both email and phone rejected', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Bob',
       lastName: 'Jones',
@@ -180,7 +176,7 @@ describe('Customer Actions', async () => {
   });
 
   it('5. Invalid email rejected', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Bob',
       lastName: 'Jones',
@@ -195,7 +191,7 @@ describe('Customer Actions', async () => {
   });
 
   it('6. Duplicate email produces warning', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Alice Duplicate',
       lastName: 'Smith',
@@ -211,7 +207,7 @@ describe('Customer Actions', async () => {
   });
 
   it('7. Duplicate phone produces warning', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res = await createCustomer({
       firstName: 'Alice Phone Dup',
       lastName: 'Smith',
@@ -226,7 +222,7 @@ describe('Customer Actions', async () => {
   });
 
   it('8 & 9. Customer number generated safely and is unique', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const res1 = await createCustomer({
       firstName: 'Seq1',
       lastName: 'User',
@@ -252,7 +248,7 @@ describe('Customer Actions', async () => {
   });
 
   it('10. Customer update works', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const customer = await createCustomer({
       firstName: 'Update',
       lastName: 'Me',
@@ -279,7 +275,7 @@ describe('Customer Actions', async () => {
   });
 
   it('11 & 12. Customer deactivation works and customer remains in db', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const customer = await createCustomer({
       firstName: 'Delete',
       lastName: 'Me',
@@ -298,7 +294,7 @@ describe('Customer Actions', async () => {
   });
 
   it('13-16. Unauthorized actions rejected', async () => {
-    currentMockCookie = 'active_unauth';
+    currentMockCookie.value = 'active_unauth';
 
     const readRes = await searchCustomers({});
     assert.strictEqual(readRes.success, false);
@@ -332,7 +328,7 @@ describe('Customer Actions', async () => {
   });
 
   it('17. createdById comes from server session', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const customer = await createCustomer({
       firstName: 'Session',
       lastName: 'Test',
@@ -346,7 +342,7 @@ describe('Customer Actions', async () => {
   });
 
   it('18, 19, 20. Search, pagination, and inactive filtering works', async () => {
-    currentMockCookie = 'active_admin';
+    currentMockCookie.value = 'active_admin';
     const searchAll = await searchCustomers({ query: 'Alice' });
     assert.strictEqual(searchAll.success, true);
     assert.ok(

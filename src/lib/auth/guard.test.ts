@@ -1,4 +1,4 @@
-import { describe, it, before, after, mock } from 'node:test';
+import { describe, it, beforeAll, afterAll, vi } from 'vitest';
 import assert from 'node:assert';
 import 'dotenv/config';
 
@@ -9,21 +9,20 @@ process.env.FIREBASE_PRIVATE_KEY =
   '-----BEGIN PRIVATE KEY-----\nMOCK\n-----END PRIVATE KEY-----';
 
 // Mock cookies based on a simple global state we can change per test
-let currentMockCookie: string | undefined = undefined;
+const { currentMockCookie } = vi.hoisted(() => ({
+  currentMockCookie: { value: undefined as string | undefined },
+}));
 
-mock.module('next/headers', {
-  // @ts-expect-error MockModuleOptions in older node types doesn't include exports
-  exports: {
-    cookies: async () => ({
-      get: (name: string) => {
-        if (name === 'stoney_session' && currentMockCookie !== undefined) {
-          return { value: currentMockCookie };
-        }
-        return undefined;
-      },
-    }),
-  },
-});
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      if (name === 'stoney_session' && currentMockCookie.value !== undefined) {
+        return { value: currentMockCookie.value };
+      }
+      return undefined;
+    },
+  }),
+}));
 
 let mockVerifySessionCookie: (
   cookie: string,
@@ -33,16 +32,13 @@ let mockVerifySessionCookie: (
   throw new Error('Not implemented in mock');
 };
 
-mock.module('../firebase/admin', {
-  // @ts-expect-error MockModuleOptions in older node types doesn't include exports
-  exports: {
-    isFirebaseAdminConfigured: () => true,
-    getFirebaseAdminAuth: () => ({
-      verifySessionCookie: (cookie: string, checkRevoked: boolean) =>
-        mockVerifySessionCookie(cookie, checkRevoked),
-    }),
-  },
-});
+vi.mock('../firebase/admin', () => ({
+  isFirebaseAdminConfigured: () => true,
+  getFirebaseAdminAuth: () => ({
+    verifySessionCookie: (cookie: string, checkRevoked: boolean) =>
+      mockVerifySessionCookie(cookie, checkRevoked),
+  }),
+}));
 
 describe('Authentication & Security', async () => {
   const { requireAuth, requireRole, requirePermission, requireBranchAccess } =
@@ -56,7 +52,7 @@ describe('Authentication & Security', async () => {
 
   let activeUser: { id: string };
 
-  before(async () => {
+  beforeAll(async () => {
     // 1. Fetch some seeded branches and roles
     branchHQ = (await prisma.branch.findFirst({ where: { code: 'HQ' } })) as {
       id: string;
@@ -153,7 +149,7 @@ describe('Authentication & Security', async () => {
     });
   });
 
-  after(async () => {
+  afterAll(async () => {
     // Cleanup
     const usersToDelete = await prisma.user.findMany({
       where: { email: { endsWith: '@test.local' } },
@@ -177,14 +173,14 @@ describe('Authentication & Security', async () => {
 
   describe('Authentication', () => {
     it('missing session -> unauthenticated', async () => {
-      currentMockCookie = undefined;
+      currentMockCookie.value = undefined;
       await assert.rejects(requireAuth(), (err: Error & { code?: string }) => {
         return err.code === 'UNAUTHORIZED';
       });
     });
 
     it('invalid Firebase identity/session -> rejected', async () => {
-      currentMockCookie = 'invalid_cookie';
+      currentMockCookie.value = 'invalid_cookie';
       mockVerifySessionCookie = async () => {
         throw new Error('auth/invalid-session-cookie');
       };
@@ -195,7 +191,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('expired session -> rejected', async () => {
-      currentMockCookie = 'expired_cookie';
+      currentMockCookie.value = 'expired_cookie';
       mockVerifySessionCookie = async () => {
         throw new Error('auth/session-cookie-expired');
       };
@@ -206,7 +202,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('revoked session -> rejected', async () => {
-      currentMockCookie = 'revoked_cookie';
+      currentMockCookie.value = 'revoked_cookie';
       mockVerifySessionCookie = async () => {
         throw new Error('auth/session-cookie-revoked');
       };
@@ -219,7 +215,7 @@ describe('Authentication & Security', async () => {
 
   describe('User resolution', () => {
     it('valid Firebase UID -> correct PostgreSQL User', async () => {
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -230,7 +226,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('Firebase identity with no PostgreSQL User -> rejected', async () => {
-      currentMockCookie = 'valid_no_db_user';
+      currentMockCookie.value = 'valid_no_db_user';
       mockVerifySessionCookie = async () => ({
         uid: 'unknown_uid',
         email: 'unknown@test.local',
@@ -242,7 +238,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('inactive PostgreSQL User -> rejected', async () => {
-      currentMockCookie = 'valid_inactive';
+      currentMockCookie.value = 'valid_inactive';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_inactive_uid',
         email: 'inactive@test.local',
@@ -256,7 +252,7 @@ describe('Authentication & Security', async () => {
 
   describe('Authorization', () => {
     it('valid authenticated user -> allowed via requireAuth', async () => {
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -265,7 +261,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('incorrect role -> 403', async () => {
-      currentMockCookie = 'valid_active'; // is Branch Manager
+      currentMockCookie.value = 'valid_active'; // is Branch Manager
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -277,7 +273,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('missing permission -> 403', async () => {
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -305,7 +301,7 @@ describe('Authentication & Security', async () => {
           create: { roleId: roleManager.id, permissionId: perm.id },
           update: {},
         });
-        currentMockCookie = 'valid_active';
+        currentMockCookie.value = 'valid_active';
         mockVerifySessionCookie = async () => ({
           uid: 'firebase_active_uid',
           email: 'active@test.local',
@@ -317,7 +313,7 @@ describe('Authentication & Security', async () => {
 
   describe('Branch isolation', () => {
     it('users own branch -> allowed', async () => {
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -326,7 +322,7 @@ describe('Authentication & Security', async () => {
     });
 
     it('different branch -> 403', async () => {
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -339,7 +335,7 @@ describe('Authentication & Security', async () => {
 
     it('manipulated client branchId -> cannot bypass authorization', async () => {
       // Assume client passes `branchOther.id` trying to access it
-      currentMockCookie = 'valid_active';
+      currentMockCookie.value = 'valid_active';
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
@@ -355,7 +351,7 @@ describe('Authentication & Security', async () => {
   describe('Identity linking security', () => {
     it('email-based first-login linking cannot grant unintended privileges (links safely)', async () => {
       // Setup: user exists in DB with no firebaseUid
-      currentMockCookie = 'unlinked_login';
+      currentMockCookie.value = 'unlinked_login';
       mockVerifySessionCookie = async () => ({
         uid: 'new_firebase_uid',
         email: 'unlinked@test.local',
@@ -403,7 +399,7 @@ describe('Authentication & Security', async () => {
         },
       });
 
-      currentMockCookie = 'conflict_login';
+      currentMockCookie.value = 'conflict_login';
       mockVerifySessionCookie = async () => ({
         uid: 'conflict_uid',
         email: 'unlinked2@test.local',

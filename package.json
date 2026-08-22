@@ -23,6 +23,7 @@
     "@prisma/client": "^7.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "decimal.js": "^10.6.0",
     "dotenv": "^17.4.2",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
@@ -52,6 +53,8 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.8",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.11"
   }
 }
