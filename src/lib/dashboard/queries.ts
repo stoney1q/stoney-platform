@@ -42,13 +42,7 @@ export async function getRevenueMetrics(): Promise<RevenueMetricsDTO> {
 
   console.time('dashboard:revenue');
 
-  const [
-    todayAgg,
-    weekAgg,
-    pendingSalesAgg,
-    pendingPaymentsAgg,
-    completedCount,
-  ] = await Promise.all([
+  const [todayAgg, weekAgg, pendingResult, completedCount] = await Promise.all([
     // Today's completed revenue
     prisma.sale.aggregate({
       _sum: { total: true },
@@ -67,24 +61,19 @@ export async function getRevenueMetrics(): Promise<RevenueMetricsDTO> {
         createdAt: { gte: weekStart, lte: weekEnd },
       },
     }),
-    // Pending total of all PENDING sales
-    prisma.sale.aggregate({
-      _sum: { total: true },
-      where: {
-        branchId,
-        status: 'PENDING',
-      },
-    }),
-    // Sum of all payments applied to PENDING sales
-    prisma.payment.aggregate({
-      _sum: { amount: true },
-      where: {
-        sale: {
-          branchId,
-          status: 'PENDING',
-        },
-      },
-    }),
+    // Pending payment amount: per-sale calculation
+    prisma.$queryRaw<
+      Array<{ pendingTotal: Prisma.Decimal | number | string | null }>
+    >`
+      SELECT SUM(s.total - COALESCE(p."paidAmount", 0)) as "pendingTotal"
+      FROM "Sale" s
+      LEFT JOIN (
+        SELECT "saleId", SUM(amount) as "paidAmount"
+        FROM "Payment"
+        GROUP BY "saleId"
+      ) p ON s.id = p."saleId"
+      WHERE s."branchId" = ${branchId} AND s.status = 'PENDING'
+    `,
     // Count of today's completed sales
     prisma.sale.count({
       where: {
@@ -97,12 +86,8 @@ export async function getRevenueMetrics(): Promise<RevenueMetricsDTO> {
 
   console.timeEnd('dashboard:revenue');
 
-  const pendingSalesTotal = pendingSalesAgg._sum.total || new Prisma.Decimal(0);
-  const pendingPaymentsApplied =
-    pendingPaymentsAgg._sum.amount || new Prisma.Decimal(0);
-
-  // Pending payment amount is the total of all pending sales minus any partial payments already made
-  const pendingOutstanding = pendingSalesTotal.minus(pendingPaymentsApplied);
+  const pendingRaw = pendingResult[0]?.pendingTotal;
+  const pendingOutstanding = new Prisma.Decimal(pendingRaw?.toString() || '0');
 
   return {
     todayTotal: (todayAgg._sum.total || new Prisma.Decimal(0)).toFixed(2),
