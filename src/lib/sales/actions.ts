@@ -19,6 +19,7 @@ import {
   MovementType,
   PaymentMethod,
   ProductType,
+  FulfillmentStatus,
 } from '@/generated/prisma/client';
 import {
   calculateDocumentSubtotal,
@@ -278,7 +279,7 @@ export async function applyPayment(formData: FormData) {
     saleId: formData.get('saleId') as string,
     amount: Number(formData.get('amount')),
     method: formData.get('method') as PaymentMethod,
-    reference: formData.get('reference') as string | undefined,
+    reference: (formData.get('reference') as string) || undefined,
   };
 
   const data = applyPaymentSchema.parse(rawData);
@@ -311,7 +312,10 @@ export async function applyPayment(formData: FormData) {
     // If this payment fully pays the sale, perform the atomic inventory consumption
     if (isFinalPayment) {
       for (const item of sale.items) {
-        if (item.productType === ProductType.GOODS) {
+        if (
+          item.productType === ProductType.GOODS &&
+          item.fulfillmentStatus === FulfillmentStatus.UNFULFILLED
+        ) {
           // Raw SQL conditional inventory update
           const result = await tx.$executeRaw`
             UPDATE "BranchStock"

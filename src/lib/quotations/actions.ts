@@ -320,6 +320,7 @@ export async function convertQuotationToSale(formData: FormData) {
         subtotal: quotation.subtotal,
         total: quotation.total,
         quotationId: quotation.id,
+        repairId: quotation.repairId,
         items: {
           create: quotation.items.map((item) => ({
             productId: item.productId,
@@ -331,6 +332,7 @@ export async function convertQuotationToSale(formData: FormData) {
             discount: item.discount,
             subtotal: item.subtotal,
             total: item.total,
+            fulfillmentStatus: item.fulfillmentStatus,
           })),
         },
       },

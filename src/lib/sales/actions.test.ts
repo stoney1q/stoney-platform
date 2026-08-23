@@ -202,6 +202,8 @@ describe('Sales Foundation Actions', async () => {
     await prisma.sale.deleteMany({
       where: { branchId: { in: [mainBranchId, otherBranchId] } },
     });
+    await prisma.repair.deleteMany({});
+    await prisma.device.deleteMany({});
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.user.deleteMany({
       where: { id: { in: [cashierUserId, otherUserId] } },

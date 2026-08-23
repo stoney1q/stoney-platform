@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { DeactivateCustomerButton } from './deactivate-button';
 
+import { prisma } from '@/lib/prisma';
+
 export default async function CustomerDetailPage({
   params,
 }: {
@@ -19,6 +21,29 @@ export default async function CustomerDetailPage({
 
   const customer = result.data;
 
+  // Fetch history for the customer
+  const [sales, repairs, quotations, deviceCount] = await Promise.all([
+    prisma.sale.findMany({
+      where: { customerId: customer.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.repair.findMany({
+      where: { customerId: customer.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { device: true },
+    }),
+    prisma.quotation.findMany({
+      where: { customerId: customer.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.device.count({
+      where: { customerId: customer.id },
+    }),
+  ]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -31,6 +56,9 @@ export default async function CustomerDetailPage({
           </p>
         </div>
         <div className="flex space-x-2">
+          <Link href={`/customers/${customer.id}/devices`}>
+            <Button variant="outline">Manage Devices ({deviceCount})</Button>
+          </Link>
           <Link href={`/customers/${customer.id}/edit`}>
             <Button variant="outline">Edit Profile</Button>
           </Link>
@@ -89,29 +117,106 @@ export default async function CustomerDetailPage({
         </div>
 
         <div className="bg-card col-span-1 space-y-6 rounded-lg border p-6 md:col-span-2">
-          <div className="border-b pb-2">
-            <h3 className="text-lg font-semibold">Sales History</h3>
+          <div className="flex items-center justify-between border-b pb-2">
+            <h3 className="text-lg font-semibold">Recent Sales</h3>
+            <Link href={`/sales/new?customerId=${customer.id}`}>
+              <Button variant="ghost" size="sm">
+                New Sale
+              </Button>
+            </Link>
           </div>
-          <p className="text-muted-foreground text-sm italic">
-            Sales module is not yet implemented. Future sales orders will appear
-            here.
-          </p>
+          {sales.length === 0 ? (
+            <p className="text-muted-foreground text-sm italic">
+              No sales found.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {sales.map((sale) => (
+                <div
+                  key={sale.id}
+                  className="flex items-center justify-between rounded border p-2 text-sm"
+                >
+                  <span>{new Date(sale.createdAt).toLocaleDateString()}</span>
+                  <span>{sale.status}</span>
+                  <span className="font-medium">${sale.total.toString()}</span>
+                  <Link
+                    href={`/sales/${sale.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    View
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <div className="mt-8 border-b pb-2">
-            <h3 className="text-lg font-semibold">Repair Tickets</h3>
+          <div className="mt-8 flex items-center justify-between border-b pb-2">
+            <h3 className="text-lg font-semibold">Recent Repair Tickets</h3>
+            <Link href={`/repairs/new?customerId=${customer.id}`}>
+              <Button variant="ghost" size="sm">
+                New Repair
+              </Button>
+            </Link>
           </div>
-          <p className="text-muted-foreground text-sm italic">
-            Repairs module is not yet implemented. Future repair tickets will
-            appear here.
-          </p>
+          {repairs.length === 0 ? (
+            <p className="text-muted-foreground text-sm italic">
+              No repair tickets found.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {repairs.map((repair) => (
+                <div
+                  key={repair.id}
+                  className="flex items-center justify-between rounded border p-2 text-sm"
+                >
+                  <span>{new Date(repair.createdAt).toLocaleDateString()}</span>
+                  <span>
+                    {repair.device.make} {repair.device.model}
+                  </span>
+                  <span>{repair.status}</span>
+                  <Link
+                    href={`/repairs/${repair.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    View
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <div className="mt-8 border-b pb-2">
-            <h3 className="text-lg font-semibold">Quotations</h3>
+          <div className="mt-8 flex items-center justify-between border-b pb-2">
+            <h3 className="text-lg font-semibold">Recent Quotations</h3>
+            <Link href={`/quotations/new?customerId=${customer.id}`}>
+              <Button variant="ghost" size="sm">
+                New Quote
+              </Button>
+            </Link>
           </div>
-          <p className="text-muted-foreground text-sm italic">
-            Quotations module is not yet implemented. Future quotes will appear
-            here.
-          </p>
+          {quotations.length === 0 ? (
+            <p className="text-muted-foreground text-sm italic">
+              No quotations found.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {quotations.map((quote) => (
+                <div
+                  key={quote.id}
+                  className="flex items-center justify-between rounded border p-2 text-sm"
+                >
+                  <span>{new Date(quote.createdAt).toLocaleDateString()}</span>
+                  <span>{quote.status}</span>
+                  <span className="font-medium">${quote.total.toString()}</span>
+                  <Link
+                    href={`/quotations/${quote.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    View
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

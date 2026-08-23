@@ -103,6 +103,18 @@ describe('Customer Actions', async () => {
   });
 
   afterAll(async () => {
+    await prisma.stockMovement.deleteMany({});
+    await prisma.repairLog.deleteMany({});
+    await prisma.repairPart.deleteMany({});
+    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
+    await prisma.quotation.updateMany({ data: { repairId: null } });
+    await prisma.quotationItem.deleteMany({});
+    await prisma.quotation.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.saleItem.deleteMany({});
+    await prisma.sale.deleteMany({});
+    await prisma.repair.deleteMany({});
+    await prisma.device.deleteMany({});
     await prisma.customer.deleteMany({});
     await prisma.user.deleteMany({
       where: { firebaseUid: { in: ['admin_uid', 'unauth_uid'] } },

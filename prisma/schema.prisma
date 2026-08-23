@@ -26,6 +26,7 @@ model Branch {
   transfersOrigin      Transfer[]      @relation("TransferOrigin")
   transfersDestination Transfer[]      @relation("TransferDest")
   sales                Sale[]
+  repairs              Repair[]
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -91,6 +92,8 @@ model User {
   customersCreated Customer[]
   salesCreated     Sale[]
   paymentsCreated  Payment[]
+  repairsAssigned  Repair[]
+  repairLogs       RepairLog[]
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -121,6 +124,11 @@ enum ProductType {
   SERVICE
 }
 
+enum FulfillmentStatus {
+  UNFULFILLED
+  PRE_FULFILLED
+}
+
 enum TransferStatus {
   PENDING
   IN_TRANSIT
@@ -141,6 +149,7 @@ model Product {
   movements    StockMovement[]
   suppliers    ProductSupplier[]
   transfers    Transfer[]
+  repairParts  RepairPart[]
 
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -253,6 +262,8 @@ model Customer {
   createdBy   User   @relation(fields: [createdById], references: [id])
 
   sales Sale[]
+  repairs Repair[]
+  devices Device[]
 
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -294,6 +305,7 @@ model Sale {
   total    Decimal @default(0) @db.Decimal(10, 2)
 
   quotationId String?    @unique
+  repairId    String?
 
   items    SaleItem[]
   payments Payment[]
@@ -302,6 +314,7 @@ model Sale {
   customer  Customer   @relation(fields: [customerId], references: [id])
   createdBy User       @relation(fields: [createdById], references: [id])
   quotation Quotation? @relation(fields: [quotationId], references: [id])
+  repair    Repair?    @relation("RepairSales", fields: [repairId], references: [id])
 
   completedAt DateTime?
   cancelledAt DateTime?
@@ -327,6 +340,8 @@ model SaleItem {
   discount  Decimal @default(0) @db.Decimal(10, 2)
   subtotal  Decimal @db.Decimal(10, 2)
   total     Decimal @db.Decimal(10, 2)
+
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
 
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -377,6 +392,11 @@ model Quotation {
 
   sale Sale?
 
+  repairId String?
+  repair   Repair? @relation("RepairQuotations", fields: [repairId], references: [id])
+
+  activeRepair Repair? @relation("ActiveRepairQuotation")
+
   branch    Branch   @relation(fields: [branchId], references: [id])
   customer  Customer @relation(fields: [customerId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
@@ -404,6 +424,110 @@ model QuotationItem {
   subtotal  Decimal @db.Decimal(10, 2)
   total     Decimal @db.Decimal(10, 2)
 
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id])
+}
+
+// ==========================================
+// REPAIRS DOMAIN
+// ==========================================
+
+enum RepairStatus {
+  RECEIVED
+  DIAGNOSING
+  QUOTED
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  DELIVERED
+  CANCELLED
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  customerId   String
+  make         String
+  model        String
+  serialNumber String?
+  notes        String?
+
+  customer     Customer @relation(fields: [customerId], references: [id])
+  repairs      Repair[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([customerId, serialNumber])
+  @@index([customerId])
+}
+
+model Repair {
+  id                String       @id @default(cuid())
+  sequence          Int          @unique @default(autoincrement())
+  version           Int          @default(1)
+  status            RepairStatus @default(RECEIVED)
+
+  branchId          String
+  customerId        String
+  deviceId          String
+  technicianId      String?
+  activeQuotationId String?      @unique
+
+  issue             String
+  notes             String?
+
+  branch            Branch       @relation(fields: [branchId], references: [id])
+  customer          Customer     @relation(fields: [customerId], references: [id])
+  device            Device       @relation(fields: [deviceId], references: [id])
+  technician        User?        @relation(fields: [technicianId], references: [id])
+
+  activeQuotation   Quotation?   @relation("ActiveRepairQuotation", fields: [activeQuotationId], references: [id])
+  allQuotations     Quotation[]  @relation("RepairQuotations")
+  sales             Sale[]       @relation("RepairSales")
+
+  parts             RepairPart[]
+  logs              RepairLog[]
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  completedAt       DateTime?
+
+  @@index([branchId, status])
+  @@index([customerId])
+  @@index([technicianId])
+}
+
+model RepairPart {
+  id               String   @id @default(cuid())
+  version          Int      @default(1)
+  repairId         String
+  productId        String
+
+  plannedQuantity  Int      @default(0)
+  consumedQuantity Int      @default(0)
+  returnedQuantity Int      @default(0)
+
+  repair           Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  product          Product  @relation(fields: [productId], references: [id])
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([repairId, productId])
+}
+
+model RepairLog {
+  id            String       @id @default(cuid())
+  repairId      String
+  userId        String
+  previousState RepairStatus?
+  newState      RepairStatus
+  notes         String?
+
+  repair        Repair       @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime     @default(now())
 }
