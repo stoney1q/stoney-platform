@@ -58,8 +58,13 @@ describe('Quotations Actions', () => {
     );
 
     // Setup DB
+    await prisma.quotationItem.deleteMany();
+    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
+    await prisma.quotation.updateMany({ data: { repairId: null } });
     await prisma.quotation.deleteMany();
     await prisma.sale.deleteMany();
+    await prisma.repair.deleteMany();
+    await prisma.device.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.product.deleteMany();
     await prisma.user.deleteMany();
@@ -106,8 +111,13 @@ describe('Quotations Actions', () => {
   });
 
   afterEach(async () => {
+    await prisma.quotationItem.deleteMany();
+    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
+    await prisma.quotation.updateMany({ data: { repairId: null } });
     await prisma.quotation.deleteMany();
     await prisma.sale.deleteMany();
+    await prisma.repair.deleteMany();
+    await prisma.device.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.product.deleteMany();
     await prisma.user.deleteMany();
