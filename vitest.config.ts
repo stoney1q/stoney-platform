@@ -6,7 +6,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
-    fileParallelism: false,
     pool: 'forks',
     hookTimeout: 30000,
     testTimeout: 30000,

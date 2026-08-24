@@ -22,10 +22,18 @@ vi.mock('../firebase/admin', () => ({
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
       if (currentMockCookie.value === 'active_admin') {
-        return { uid: 'admin_uid', email: 'admin@test.local' };
+        return {
+          uid: 'admin_cust_uid',
+          email: 'admin_cust@test.local',
+          email_verified: true,
+        };
       }
       if (currentMockCookie.value === 'active_unauth') {
-        return { uid: 'unauth_uid', email: 'unauth@test.local' };
+        return {
+          uid: 'unauth_cust_uid',
+          email: 'unauth_cust@test.local',
+          email_verified: true,
+        };
       }
       throw new Error('auth/invalid-session-cookie');
     },
@@ -62,40 +70,59 @@ describe('Customer Actions', async () => {
       )
     );
 
-    const branch = await prisma.branch.create({
-      data: { name: 'Test HQ', code: 'CUS_HQ', isActive: true },
+    const branch = await prisma.branch.upsert({
+      where: { code: 'CUS_HQ' },
+      update: {},
+      create: { name: 'Test HQ', code: 'CUS_HQ', isActive: true },
     });
 
-    const adminRole = await prisma.role.create({
-      data: { name: 'Customer Admin' },
+    const adminRole = await prisma.role.upsert({
+      where: { name: 'Customer Admin' },
+      update: {},
+      create: { name: 'Customer Admin' },
     });
 
     await prisma.rolePermission.createMany({
       data: perms.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
+      skipDuplicates: true,
     });
 
-    const unauthRole = await prisma.role.create({
-      data: { name: 'Customer Unauth' },
+    const unauthRole = await prisma.role.upsert({
+      where: { name: 'Customer Unauth' },
+      update: {},
+      create: { name: 'Customer Unauth' },
     });
 
-    const adminUser = await prisma.user.create({
-      data: {
+    const adminUser = await prisma.user.upsert({
+      where: { email: 'admin_cust@test.local' },
+      update: {
+        firebaseUid: 'admin_cust_uid',
+        branchId: branch.id,
+        roleId: adminRole.id,
+      },
+      create: {
         firstName: 'Admin',
         lastName: 'User',
-        email: 'admin@test.local',
-        firebaseUid: 'admin_uid',
+        email: 'admin_cust@test.local',
+        firebaseUid: 'admin_cust_uid',
         branchId: branch.id,
         roleId: adminRole.id,
       },
     });
     adminUserId = adminUser.id;
 
-    await prisma.user.create({
-      data: {
+    await prisma.user.upsert({
+      where: { email: 'unauth_cust@test.local' },
+      update: {
+        firebaseUid: 'unauth_cust_uid',
+        branchId: branch.id,
+        roleId: unauthRole.id,
+      },
+      create: {
         firstName: 'Unauth',
         lastName: 'User',
-        email: 'unauth@test.local',
-        firebaseUid: 'unauth_uid',
+        email: 'unauth_cust@test.local',
+        firebaseUid: 'unauth_cust_uid',
         branchId: branch.id,
         roleId: unauthRole.id,
       },
@@ -103,23 +130,13 @@ describe('Customer Actions', async () => {
   });
 
   afterAll(async () => {
-    await prisma.stockMovement.deleteMany({});
-    await prisma.repairLog.deleteMany({});
-    await prisma.repairPart.deleteMany({});
-    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
-    await prisma.quotation.updateMany({ data: { repairId: null } });
-    await prisma.quotationItem.deleteMany({});
-    await prisma.quotation.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.saleItem.deleteMany({});
-    await prisma.sale.deleteMany({});
-    await prisma.repair.deleteMany({});
-    await prisma.device.deleteMany({});
-    await prisma.customer.deleteMany({});
+    await prisma.customer.deleteMany({ where: { createdById: adminUserId } });
     await prisma.user.deleteMany({
-      where: { firebaseUid: { in: ['admin_uid', 'unauth_uid'] } },
+      where: { firebaseUid: { in: ['admin_cust_uid', 'unauth_cust_uid'] } },
     });
-    await prisma.rolePermission.deleteMany({});
+    await prisma.rolePermission.deleteMany({
+      where: { role: { name: { in: ['Customer Admin', 'Customer Unauth'] } } },
+    });
     await prisma.role.deleteMany({
       where: { name: { in: ['Customer Admin', 'Customer Unauth'] } },
     });

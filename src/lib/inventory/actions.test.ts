@@ -23,10 +23,14 @@ vi.mock('../firebase/admin', () => ({
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
       if (currentMockCookie.value === 'active_hq_user') {
-        return { uid: 'hq_uid', email: 'hq@test.local' };
+        return { uid: 'hq_uid', email: 'hq@test.local', email_verified: true };
       }
       if (currentMockCookie.value === 'active_other_user') {
-        return { uid: 'other_uid', email: 'other@test.local' };
+        return {
+          uid: 'other_inv_uid',
+          email: 'other@test.local',
+          email_verified: true,
+        };
       }
       throw new Error('auth/invalid-session-cookie');
     },
@@ -91,26 +95,33 @@ describe('Inventory Actions & Security', async () => {
       });
     }
 
-    // Clean users
-    await prisma.stockMovement.deleteMany();
-    await prisma.repairLog.deleteMany();
-    await prisma.repairPart.deleteMany();
-    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
-    await prisma.quotation.updateMany({ data: { repairId: null } });
-    await prisma.quotationItem.deleteMany({});
-    await prisma.quotation.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.saleItem.deleteMany({});
-    await prisma.sale.deleteMany({});
-    await prisma.repair.deleteMany();
-    await prisma.device.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.user.deleteMany({
-      where: { email: { endsWith: '@test.local' } },
+    // Clean users and their dependencies
+    await prisma.stockMovement.deleteMany({
+      where: { branchId: { in: [branchHQ.id, branchOther.id] } },
     });
-
-    await prisma.user.create({
-      data: {
+    await prisma.transfer.deleteMany({
+      where: {
+        OR: [
+          { originId: { in: [branchHQ.id, branchOther.id] } },
+          { destinationId: { in: [branchHQ.id, branchOther.id] } },
+        ],
+      },
+    });
+    await prisma.branchStock.deleteMany({
+      where: { branchId: { in: [branchHQ.id, branchOther.id] } },
+    });
+    await prisma.user.deleteMany({
+      where: { email: { in: ['hq@test.local', 'other@test.local'] } },
+    });
+    await prisma.product.deleteMany({ where: { sku: 'TEST-SKU-1' } });
+    await prisma.user.upsert({
+      where: { email: 'hq@test.local' },
+      update: {
+        firebaseUid: 'hq_uid',
+        branchId: branchHQ.id,
+        roleId: roleManager.id,
+      },
+      create: {
         firstName: 'HQ',
         lastName: 'User',
         email: 'hq@test.local',
@@ -122,12 +133,18 @@ describe('Inventory Actions & Security', async () => {
       },
     });
 
-    await prisma.user.create({
-      data: {
+    await prisma.user.upsert({
+      where: { email: 'other@test.local' },
+      update: {
+        firebaseUid: 'other_inv_uid',
+        branchId: branchOther.id,
+        roleId: roleManager.id,
+      },
+      create: {
         firstName: 'Other',
         lastName: 'User',
         email: 'other@test.local',
-        firebaseUid: 'other_uid',
+        firebaseUid: 'other_inv_uid',
         isActive: true,
         emailVerified: true,
         branchId: branchOther.id,
@@ -136,25 +153,30 @@ describe('Inventory Actions & Security', async () => {
     });
 
     // Setup product
-    await prisma.product.deleteMany({ where: { sku: 'TEST-SKU-1' } });
     productA = await prisma.product.create({
       data: { sku: 'TEST-SKU-1', name: 'Test Product 1' },
     });
-
-    // Clean stock and transfers
-    await prisma.stockMovement.deleteMany({});
-    await prisma.transfer.deleteMany({});
-    await prisma.branchStock.deleteMany({});
   });
 
   afterAll(async () => {
     // Cleanup
-    await prisma.stockMovement.deleteMany({});
-    await prisma.transfer.deleteMany({});
-    await prisma.branchStock.deleteMany({});
+    await prisma.stockMovement.deleteMany({
+      where: { branchId: { in: [branchHQ.id, branchOther.id] } },
+    });
+    await prisma.transfer.deleteMany({
+      where: {
+        OR: [
+          { originId: { in: [branchHQ.id, branchOther.id] } },
+          { destinationId: { in: [branchHQ.id, branchOther.id] } },
+        ],
+      },
+    });
+    await prisma.branchStock.deleteMany({
+      where: { branchId: { in: [branchHQ.id, branchOther.id] } },
+    });
     await prisma.product.deleteMany({ where: { sku: 'TEST-SKU-1' } });
     await prisma.user.deleteMany({
-      where: { email: { endsWith: '@test.local' } },
+      where: { email: { in: ['hq@test.local', 'other@test.local'] } },
     });
     await prisma.$disconnect();
   });
@@ -324,6 +346,52 @@ describe('Inventory Actions & Security', async () => {
       );
       const cancelled = await cancelTransfer(t.id);
       assert.strictEqual(cancelled.status, 'CANCELLED');
+    });
+
+    it('prevents Manager from dispatching transfer originating in another branch', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const t = await createTransfer(
+        branchHQ.id,
+        branchOther.id,
+        productA.id,
+        5
+      );
+
+      currentMockCookie.value = 'active_other_user';
+      await assert.rejects(dispatchTransfer(t.id), (err: Error) =>
+        err.message.includes('Access denied')
+      );
+    });
+
+    it('prevents Manager from receiving transfer destined for another branch', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const t = await createTransfer(
+        branchHQ.id,
+        branchOther.id,
+        productA.id,
+        5
+      );
+      await dispatchTransfer(t.id);
+
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(receiveTransfer(t.id), (err: Error) =>
+        err.message.includes('Access denied')
+      );
+    });
+
+    it('prevents Manager without admin:global from cancelling another branch transfer', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const t = await createTransfer(
+        branchHQ.id,
+        branchOther.id,
+        productA.id,
+        5
+      );
+
+      currentMockCookie.value = 'active_other_user';
+      await assert.rejects(cancelTransfer(t.id), (err: Error) =>
+        err.message.includes('Access denied')
+      );
     });
   });
 });

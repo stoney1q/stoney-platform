@@ -246,7 +246,7 @@ export async function dispatchTransfer(transferId: string) {
     // Verify origin access
     if (
       user.role.name !== 'Super Admin' &&
-      !user.permissions.includes('branches:read') &&
+      !user.permissions.includes('admin:global') &&
       user.branchId !== transfer.originId
     ) {
       throw new Error(
@@ -307,7 +307,7 @@ export async function receiveTransfer(transferId: string) {
     // Verify destination access
     if (
       user.role.name !== 'Super Admin' &&
-      !user.permissions.includes('branches:read') &&
+      !user.permissions.includes('admin:global') &&
       user.branchId !== transfer.destinationId
     ) {
       throw new Error(
@@ -370,7 +370,7 @@ export async function cancelTransfer(transferId: string) {
     // Verify origin access
     if (
       user.role.name !== 'Super Admin' &&
-      !user.permissions.includes('branches:read') &&
+      !user.permissions.includes('admin:global') &&
       user.branchId !== transfer.originId
     ) {
       throw new Error(

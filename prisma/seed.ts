@@ -272,6 +272,11 @@ const FOUNDATIONAL_PERMISSIONS: PermissionDefinition[] = [
     name: 'settings:update',
     description: 'Modify platform settings, tax rules, and system options',
   },
+  {
+    name: 'admin:global',
+    description:
+      'Global bypass of branch isolation for administrative operations',
+  },
 ];
 
 // ==========================================
@@ -281,6 +286,7 @@ const FOUNDATIONAL_PERMISSIONS: PermissionDefinition[] = [
 // ==========================================
 const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
   Admin: [
+    'admin:global',
     'dashboard:read',
     'users:read',
     'users:create',

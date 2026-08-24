@@ -105,6 +105,14 @@ export async function getCurrentUser(
       });
 
       if (userByEmail && !userByEmail.firebaseUid) {
+        if (!decodedToken.email_verified) {
+          throw new AuthError(
+            'Email must be verified before claiming a provisioned account.',
+            403,
+            'FORBIDDEN'
+          );
+        }
+
         // Atomically link Firebase UID to the PostgreSQL User record
         dbUser = await prisma.user.update({
           where: { id: userByEmail.id },
@@ -240,7 +248,7 @@ export async function requirePermission(
 
 /**
  * Enforces branch isolation on server actions and route handlers.
- * Super Admin and users with 'branches:read' bypass branch isolation.
+ * Super Admin and users with 'admin:global' bypass branch isolation.
  * Throws 403 AuthError if the user attempts to access a branch outside their assignment.
  */
 export async function requireBranchAccess(
@@ -249,13 +257,84 @@ export async function requireBranchAccess(
   const user = await requireAuth();
   if (
     user.role.name === 'Super Admin' ||
-    user.permissions.includes('branches:read') ||
+    user.permissions.includes('admin:global') ||
     user.branchId === targetBranchId
   ) {
     return user;
   }
   throw new AuthError(
     'Access denied. You do not have permission to access records for this branch.',
+    403,
+    'FORBIDDEN'
+  );
+}
+
+/**
+ * Ensures the authenticated user can assign the target role.
+ * Throws 403 AuthError if the target role contains permissions the user lacks.
+ */
+export async function assertCanAssignRole(
+  user: AuthenticatedUser,
+  targetRoleId: string
+): Promise<void> {
+  if (user.role.name === 'Super Admin') return;
+
+  const targetRole = await prisma.role.findUnique({
+    where: { id: targetRoleId },
+    include: {
+      rolePermissions: {
+        include: { permission: true },
+      },
+    },
+  });
+
+  if (!targetRole) {
+    throw new Error('Target role not found');
+  }
+
+  if (targetRole.name === 'Super Admin') {
+    throw new AuthError(
+      'Access denied. Only a Super Admin can assign the Super Admin role.',
+      403,
+      'FORBIDDEN'
+    );
+  }
+
+  const targetPermissions = targetRole.rolePermissions
+    .map((rp) => rp.permission?.name)
+    .filter((name): name is string => name !== undefined);
+
+  const hasAllPermissions = targetPermissions.every((p) =>
+    user.permissions.includes(p)
+  );
+
+  if (!hasAllPermissions) {
+    throw new AuthError(
+      'Access denied. You cannot assign a role that contains permissions you do not possess.',
+      403,
+      'FORBIDDEN'
+    );
+  }
+}
+
+/**
+ * Ensures the authenticated user can assign a user to the target branch.
+ * Throws 403 AuthError if the user does not have permission to assign to that branch.
+ */
+export async function assertCanAssignBranch(
+  user: AuthenticatedUser,
+  targetBranchId: string
+): Promise<void> {
+  if (user.role.name === 'Super Admin') return;
+
+  if (user.branchId === targetBranchId) return;
+
+  if (user.permissions.includes('admin:global')) {
+    return;
+  }
+
+  throw new AuthError(
+    'Access denied. You cannot assign staff to a branch outside your authorized scope.',
     403,
     'FORBIDDEN'
   );

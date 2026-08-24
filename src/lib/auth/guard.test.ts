@@ -92,7 +92,17 @@ describe('Authentication & Security', async () => {
 
     // Ensure we don't conflict with existing data by cleaning up any left-over test users
     const usersToDelete = await prisma.user.findMany({
-      where: { email: { endsWith: '@test.local' } },
+      where: {
+        email: {
+          in: [
+            'active@test.local',
+            'inactive@test.local',
+            'unlinked@test.local',
+            'conflict@test.local',
+            'unlinked2@test.local',
+          ],
+        },
+      },
     });
     if (usersToDelete.length > 0) {
       const userIds = usersToDelete.map((u) => u.id);
@@ -152,7 +162,17 @@ describe('Authentication & Security', async () => {
   afterAll(async () => {
     // Cleanup
     const usersToDelete = await prisma.user.findMany({
-      where: { email: { endsWith: '@test.local' } },
+      where: {
+        email: {
+          in: [
+            'active@test.local',
+            'inactive@test.local',
+            'unlinked@test.local',
+            'conflict@test.local',
+            'unlinked2@test.local',
+          ],
+        },
+      },
     });
     if (usersToDelete.length > 0) {
       const userIds = usersToDelete.map((u) => u.id);
@@ -167,7 +187,7 @@ describe('Authentication & Security', async () => {
       });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     }
-    await prisma.branch.deleteMany({ where: { code: 'OTHER' } });
+
     await prisma.$disconnect();
   });
 
@@ -219,6 +239,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       const user = await requireAuth();
       assert.strictEqual(user.email, 'active@test.local');
@@ -230,6 +251,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'unknown_uid',
         email: 'unknown@test.local',
+        email_verified: true,
       });
       await assert.rejects(
         requireAuth(),
@@ -242,6 +264,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_inactive_uid',
         email: 'inactive@test.local',
+        email_verified: true,
       });
       await assert.rejects(
         requireAuth(),
@@ -256,6 +279,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       await assert.doesNotReject(requireAuth());
     });
@@ -265,6 +289,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       await assert.rejects(
         requireRole('Super Admin'),
@@ -277,6 +302,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       await assert.rejects(
         requirePermission('non_existent_permission'),
@@ -305,6 +331,7 @@ describe('Authentication & Security', async () => {
         mockVerifySessionCookie = async () => ({
           uid: 'firebase_active_uid',
           email: 'active@test.local',
+          email_verified: true,
         });
         await assert.doesNotReject(requirePermission('users:read'));
       }
@@ -317,6 +344,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       await assert.doesNotReject(requireBranchAccess(branchHQ.id));
     });
@@ -326,6 +354,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       await assert.rejects(
         requireBranchAccess(branchOther.id),
@@ -339,6 +368,7 @@ describe('Authentication & Security', async () => {
       mockVerifySessionCookie = async () => ({
         uid: 'firebase_active_uid',
         email: 'active@test.local',
+        email_verified: true,
       });
       // The check happens against targetBranchId
       await assert.rejects(

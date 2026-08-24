@@ -18,7 +18,7 @@ export default async function MovementsPage() {
 
   const where =
     user.role.name === 'Super Admin' ||
-    user.permissions.includes('branches:read')
+    user.permissions.includes('admin:global')
       ? {}
       : { branchId: user.branchId };
 

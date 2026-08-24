@@ -18,19 +18,26 @@ vi.mock('@/lib/auth/guard', () => ({
 }));
 
 describe('Quotations Actions', () => {
-  const mockUserId = 'user-123';
-  const mockBranchId = 'branch-123';
-  const mockCustomerId = 'customer-123';
-  const mockProductId = 'product-123';
+  let mockUserId = '';
+  let mockBranchId = '';
+  let mockRoleId = '';
+  let mockCustomerId = '';
+  let mockProductId = '';
 
   beforeEach(async () => {
     vi.resetAllMocks();
 
     // Default mocks
+    mockUserId = `user_${Date.now()}_${Math.random()}`;
+    mockBranchId = `branch_${Date.now()}_${Math.random()}`;
+    mockRoleId = `role_${Date.now()}_${Math.random()}`;
+    mockCustomerId = `customer_${Date.now()}_${Math.random()}`;
+    mockProductId = `product_${Date.now()}_${Math.random()}`;
+
     vi.mocked(authGuard.requireAuth).mockResolvedValue({
       id: mockUserId,
       branchId: mockBranchId,
-      roleId: 'role-123',
+      roleId: mockRoleId,
       email: 'test@test.com',
       firstName: 'Test',
       lastName: 'User',
@@ -43,7 +50,7 @@ describe('Quotations Actions', () => {
     vi.mocked(authGuard.requirePermission).mockResolvedValue({
       id: mockUserId,
       branchId: mockBranchId,
-      roleId: 'role-123',
+      roleId: mockRoleId,
       email: 'test@test.com',
       firstName: 'Test',
       lastName: 'User',
@@ -58,25 +65,31 @@ describe('Quotations Actions', () => {
     );
 
     // Setup DB
-    await prisma.quotationItem.deleteMany();
-    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
-    await prisma.quotation.updateMany({ data: { repairId: null } });
-    await prisma.quotation.deleteMany();
-    await prisma.sale.deleteMany();
-    await prisma.repair.deleteMany();
-    await prisma.device.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.branch.deleteMany();
-    await prisma.role.deleteMany();
+    // Clean up anything associated with these unique IDs (in case of a test failure leaving dirty state, though usually afterEach handles it)
+    await prisma.quotationItem.deleteMany({
+      where: { quotation: { branchId: mockBranchId } },
+    });
+    await prisma.quotation.deleteMany({ where: { branchId: mockBranchId } });
+    await prisma.sale.deleteMany({ where: { branchId: mockBranchId } });
+    await prisma.customer.deleteMany({ where: { id: mockCustomerId } });
+    await prisma.product.deleteMany({ where: { id: mockProductId } });
+    await prisma.user.deleteMany({ where: { id: mockUserId } });
+    await prisma.role.deleteMany({ where: { id: mockRoleId } });
+    await prisma.branch.deleteMany({ where: { id: mockBranchId } });
 
     await prisma.branch.create({
-      data: { id: mockBranchId, name: 'Main Branch', code: 'MAIN' },
+      data: {
+        id: mockBranchId,
+        name: 'Test Branch',
+        code: `TEST_BR_${Date.now()}_${Math.random()}`,
+      },
     });
 
     await prisma.role.create({
-      data: { id: 'role-123', name: 'Admin' },
+      data: {
+        id: mockRoleId,
+        name: `Test Role ${Date.now()}_${Math.random()}`,
+      },
     });
 
     await prisma.user.create({
@@ -84,9 +97,9 @@ describe('Quotations Actions', () => {
         id: mockUserId,
         firstName: 'Admin',
         lastName: 'User',
-        email: 'admin@test.com',
+        email: `admin_${Date.now()}@test.com`,
         branchId: mockBranchId,
-        roleId: 'role-123',
+        roleId: mockRoleId,
       },
     });
 
@@ -102,7 +115,7 @@ describe('Quotations Actions', () => {
     await prisma.product.create({
       data: {
         id: mockProductId,
-        sku: 'TEST-SKU',
+        sku: `TEST-SKU-${Date.now()}`,
         name: 'Test Product',
         type: ProductType.GOODS,
         sellingPrice: 100,
@@ -111,18 +124,19 @@ describe('Quotations Actions', () => {
   });
 
   afterEach(async () => {
-    await prisma.quotationItem.deleteMany();
-    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
-    await prisma.quotation.updateMany({ data: { repairId: null } });
-    await prisma.quotation.deleteMany();
-    await prisma.sale.deleteMany();
-    await prisma.repair.deleteMany();
-    await prisma.device.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.branch.deleteMany();
-    await prisma.role.deleteMany();
+    await prisma.quotationItem.deleteMany({
+      where: { quotation: { branchId: mockBranchId } },
+    });
+    await prisma.quotation.deleteMany({ where: { branchId: mockBranchId } });
+    await prisma.saleItem.deleteMany({
+      where: { sale: { branchId: mockBranchId } },
+    });
+    await prisma.sale.deleteMany({ where: { branchId: mockBranchId } });
+    await prisma.customer.deleteMany({ where: { id: mockCustomerId } });
+    await prisma.product.deleteMany({ where: { id: mockProductId } });
+    await prisma.user.deleteMany({ where: { id: mockUserId } });
+    await prisma.role.deleteMany({ where: { id: mockRoleId } });
+    await prisma.branch.deleteMany({ where: { id: mockBranchId } });
   });
 
   describe('createQuotation', () => {
