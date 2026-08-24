@@ -29,10 +29,18 @@ vi.mock('../firebase/admin', () => ({
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
       if (currentMockCookie.value === 'active_cashier') {
-        return { uid: 'cashier_uid', email: 'cashier@test.com' };
+        return {
+          uid: 'cashier_uid',
+          email: 'cashier@test.com',
+          email_verified: true,
+        };
       }
       if (currentMockCookie.value === 'active_other') {
-        return { uid: 'other_uid', email: 'other@test.com' };
+        return {
+          uid: 'other_uid',
+          email: 'other@test.com',
+          email_verified: true,
+        };
       }
       throw new Error('auth/invalid-session-cookie');
     },
@@ -202,8 +210,6 @@ describe('Sales Foundation Actions', async () => {
     await prisma.sale.deleteMany({
       where: { branchId: { in: [mainBranchId, otherBranchId] } },
     });
-    await prisma.repair.deleteMany({});
-    await prisma.device.deleteMany({});
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.user.deleteMany({
       where: { id: { in: [cashierUserId, otherUserId] } },

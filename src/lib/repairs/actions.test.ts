@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import {
   ProductType,
@@ -51,29 +51,44 @@ describe('Repairs Actions', () => {
   let productId: string;
   let technicianId: string;
 
-  beforeEach(async () => {
-    await prisma.stockMovement.deleteMany();
-    await prisma.repairLog.deleteMany();
-    await prisma.repairPart.deleteMany();
-    await prisma.repair.deleteMany();
-    await prisma.saleItem.deleteMany();
-    await prisma.payment.deleteMany();
-    await prisma.sale.deleteMany();
-    await prisma.quotationItem.deleteMany();
-    await prisma.repair.updateMany({ data: { activeQuotationId: null } });
-    await prisma.quotation.updateMany({ data: { repairId: null } });
-    await prisma.quotation.deleteMany();
-    await prisma.repairPart.deleteMany();
-    await prisma.repairLog.deleteMany();
-    await prisma.repair.deleteMany();
-    await prisma.device.deleteMany();
-    await prisma.customer.deleteMany();
-    await prisma.branchStock.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
-    await prisma.branch.deleteMany();
+  let roleId: string;
+  let userId: string;
 
+  afterEach(async () => {
+    // Scoped cleanup
+    await prisma.stockMovement.deleteMany({ where: { branchId } });
+    await prisma.repairLog.deleteMany({ where: { repair: { branchId } } });
+    await prisma.repairPart.deleteMany({ where: { repair: { branchId } } });
+    await prisma.repair.updateMany({
+      where: { branchId },
+      data: { activeQuotationId: null },
+    });
+
+    await prisma.quotationItem.deleteMany({
+      where: { quotation: { branchId } },
+    });
+    await prisma.quotation.updateMany({
+      where: { branchId },
+      data: { repairId: null },
+    });
+    await prisma.quotation.deleteMany({ where: { branchId } });
+
+    await prisma.saleItem.deleteMany({ where: { sale: { branchId } } });
+    await prisma.payment.deleteMany({ where: { sale: { branchId } } });
+    await prisma.sale.deleteMany({ where: { branchId } });
+
+    await prisma.repair.deleteMany({ where: { branchId } });
+
+    await prisma.device.deleteMany({ where: { customerId } });
+    await prisma.customer.deleteMany({ where: { id: customerId } });
+    await prisma.branchStock.deleteMany({ where: { branchId } });
+    await prisma.product.deleteMany({ where: { id: productId } });
+    await prisma.user.deleteMany({ where: { branchId } });
+    if (roleId) await prisma.role.deleteMany({ where: { id: roleId } });
+    if (branchId) await prisma.branch.deleteMany({ where: { id: branchId } });
+  });
+
+  beforeEach(async () => {
     // Basic seed for tests
     const branch = await prisma.branch.create({
       data: {
@@ -86,6 +101,7 @@ describe('Repairs Actions', () => {
     const role = await prisma.role.create({
       data: { name: `Test Role ${Date.now()}_${Math.random()}` },
     });
+    roleId = role.id;
 
     const user = await prisma.user.create({
       data: {
@@ -96,6 +112,7 @@ describe('Repairs Actions', () => {
         roleId: role.id,
       },
     });
+    userId = user.id;
 
     const tech = await prisma.user.create({
       data: {

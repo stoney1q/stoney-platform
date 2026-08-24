@@ -20,7 +20,7 @@ export default async function StockPage() {
   // Super Admin and branch readers can see all, otherwise isolate to their branch
   const where =
     user.role.name === 'Super Admin' ||
-    user.permissions.includes('branches:read')
+    user.permissions.includes('admin:global')
       ? {}
       : { branchId: user.branchId };
 
