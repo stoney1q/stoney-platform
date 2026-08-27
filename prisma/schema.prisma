@@ -143,6 +143,8 @@ model Product {
   description  String?
   type         ProductType @default(GOODS)
   sellingPrice Decimal     @default(0) @db.Decimal(10, 2)
+  categoryId   String?
+  brandId      String?
 
   branchStocks BranchStock[]
   saleItems    SaleItem[]
@@ -151,9 +153,15 @@ model Product {
   transfers    Transfer[]
   repairParts  RepairPart[]
 
+  category     Category?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand        Brand?          @relation(fields: [brandId], references: [id], onDelete: Restrict)
+
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   quotationItems QuotationItem[]
+
+  @@index([categoryId])
+  @@index([brandId])
 }
 
 model Supplier {
@@ -530,4 +538,28 @@ model RepairLog {
   user          User         @relation(fields: [userId], references: [id])
 
   createdAt     DateTime     @default(now())
+}
+
+// ==========================================
+// TAXONOMY DOMAIN
+// ==========================================
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+
+  products  Product[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+
+  products  Product[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }

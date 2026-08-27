@@ -24,6 +24,8 @@ import {
   Payment,
   Product,
   BranchStock,
+  Category,
+  Brand,
 } from '@/generated/prisma/client';
 
 type SaleWithRelations = Sale & {
@@ -39,9 +41,17 @@ type ProductWithStock = Product & {
 export function SaleDetailsClient({
   sale,
   availableProducts,
+  categories = [],
+  brands = [],
+  categoryId = '',
+  brandId = '',
 }: {
   sale: SaleWithRelations;
   availableProducts: ProductWithStock[];
+  categories?: Category[];
+  brands?: Brand[];
+  categoryId?: string;
+  brandId?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +181,57 @@ export function SaleDetailsClient({
         </div>
 
         {sale.status === 'PENDING' && (
-          <div className="bg-card rounded-lg border p-4">
+          <div className="bg-card space-y-4 rounded-lg border p-4">
+            <form method="GET" className="mb-4 flex gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  Filter by Category
+                </label>
+                <select
+                  name="categoryId"
+                  defaultValue={categoryId}
+                  className="border-input flex h-8 w-full rounded-md border bg-transparent px-2 py-1 text-sm shadow-sm"
+                  onChange={(e) => e.target.form?.submit()}
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Filter by Brand</label>
+                <select
+                  name="brandId"
+                  defaultValue={brandId}
+                  className="border-input flex h-8 w-full rounded-md border bg-transparent px-2 py-1 text-sm shadow-sm"
+                  onChange={(e) => e.target.form?.submit()}
+                >
+                  <option value="">All Brands</option>
+                  {brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <noscript>
+                <div className="flex items-end">
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8"
+                  >
+                    Filter
+                  </Button>
+                </div>
+              </noscript>
+            </form>
+
             <form action={handleAddItem} className="flex items-end gap-2">
               <div className="flex-1 space-y-2">
                 <label className="text-xs font-medium">Product</label>

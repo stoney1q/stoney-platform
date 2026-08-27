@@ -4,9 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createProduct } from '@/lib/inventory/actions';
-import { ProductType } from '@/generated/prisma/client';
+import { ProductType, Category, Brand } from '@/generated/prisma/client';
 
-export function ProductFormDialog() {
+export function ProductFormDialog({
+  categories = [],
+  brands = [],
+}: {
+  categories?: Category[];
+  brands?: Brand[];
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +29,8 @@ export function ProductFormDialog() {
         description: formData.get('description') as string,
         type: formData.get('type') as ProductType,
         sellingPrice: Number(formData.get('sellingPrice')),
+        categoryId: formData.get('categoryId') as string | null,
+        brandId: formData.get('brandId') as string | null,
       };
 
       await createProduct(data);
@@ -95,6 +103,38 @@ export function ProductFormDialog() {
                   required
                   className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <select
+                    name="categoryId"
+                    className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm"
+                  >
+                    <option value="">-- None --</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Brand</label>
+                  <select
+                    name="brandId"
+                    className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm"
+                  >
+                    <option value="">-- None --</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

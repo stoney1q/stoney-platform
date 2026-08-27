@@ -21,6 +21,8 @@ export async function createProduct(data: {
   description?: string;
   sellingPrice?: number;
   type?: ProductType;
+  categoryId?: string | null;
+  brandId?: string | null;
 }) {
   await requirePermission('inventory:write');
 
@@ -32,19 +34,33 @@ export async function createProduct(data: {
   }
 
   return await prisma.product.create({
-    data,
+    data: {
+      ...data,
+      // Prisma expects undefined for omitted optional fields, but if someone passes empty string, convert to null
+      categoryId: data.categoryId || null,
+      brandId: data.brandId || null,
+    },
   });
 }
 
 export async function updateProduct(
   id: string,
-  data: { name: string; description?: string }
+  data: {
+    name?: string;
+    description?: string;
+    categoryId?: string | null;
+    brandId?: string | null;
+  }
 ) {
   await requirePermission('inventory:write');
 
   return await prisma.product.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      categoryId: data.categoryId === '' ? null : data.categoryId,
+      brandId: data.brandId === '' ? null : data.brandId,
+    },
   });
 }
 
