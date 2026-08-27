@@ -52,7 +52,6 @@ describe('Repairs Actions', () => {
   let technicianId: string;
 
   let roleId: string;
-  let userId: string;
 
   afterEach(async () => {
     // Scoped cleanup
@@ -112,7 +111,6 @@ describe('Repairs Actions', () => {
         roleId: role.id,
       },
     });
-    userId = user.id;
 
     const tech = await prisma.user.create({
       data: {

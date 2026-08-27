@@ -11,8 +11,8 @@ import {
   Wrench,
   Receipt,
   FileText,
-  LineChart,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -98,14 +98,14 @@ export const NAVIGATION_CONFIG: NavigationItem[] = [
   {
     label: 'Reports',
     href: '/reports',
-    icon: LineChart,
+    icon: BarChart3,
     permission: 'reports:read',
   },
   {
-    label: 'Settings',
-    href: '/settings',
+    label: 'Admin',
+    href: '/admin',
     icon: Settings,
-    permission: 'settings:read',
+    permission: 'admin:global',
   },
 ];
 
