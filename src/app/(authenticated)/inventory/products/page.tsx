@@ -10,13 +10,33 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ProductFormDialog } from './product-form';
+import { getCategories, getBrands } from '@/lib/inventory/taxonomy-actions';
+import Link from 'next/link';
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ categoryId?: string; brandId?: string }>;
+}) {
   await requirePermission('inventory:read');
 
-  const products = await prisma.product.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+  const { categoryId, brandId } = await searchParams;
+
+  const [products, categories, brands] = await Promise.all([
+    prisma.product.findMany({
+      where: {
+        ...(categoryId ? { categoryId } : {}),
+        ...(brandId ? { brandId } : {}),
+      },
+      include: {
+        category: true,
+        brand: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getCategories(),
+    getBrands(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -27,7 +47,52 @@ export default async function ProductsPage() {
             Manage the product catalog and SKUs.
           </p>
         </div>
-        <ProductFormDialog />
+        <ProductFormDialog categories={categories} brands={brands} />
+      </div>
+
+      <div className="flex gap-4">
+        <form className="flex gap-4">
+          <select
+            name="categoryId"
+            defaultValue={categoryId || ''}
+            className="border-input h-9 rounded-md border px-3 text-sm"
+            onChange={(e) => e.target.form?.submit()}
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            name="brandId"
+            defaultValue={brandId || ''}
+            className="border-input h-9 rounded-md border px-3 text-sm"
+            onChange={(e) => e.target.form?.submit()}
+          >
+            <option value="">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <noscript>
+            <Button type="submit" variant="secondary" size="sm">
+              Filter
+            </Button>
+          </noscript>
+
+          {(categoryId || brandId) && (
+            <Link href="/inventory/products">
+              <Button type="button" variant="ghost" size="sm">
+                Clear
+              </Button>
+            </Link>
+          )}
+        </form>
       </div>
 
       <div className="rounded-md border">
@@ -37,6 +102,8 @@ export default async function ProductsPage() {
               <TableHead>SKU</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Brand</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -62,6 +129,8 @@ export default async function ProductsPage() {
                     </span>
                   </TableCell>
                   <TableCell>{product.name}</TableCell>
+                  <TableCell>{product.category?.name || '-'}</TableCell>
+                  <TableCell>{product.brand?.name || '-'}</TableCell>
                   <TableCell>
                     ${Number(product.sellingPrice).toFixed(2)}
                   </TableCell>

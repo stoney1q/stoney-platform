@@ -46,6 +46,8 @@ describe('Inventory Actions & Security', async () => {
     dispatchTransfer,
     receiveTransfer,
     cancelTransfer,
+    createProduct,
+    updateProduct,
   } = await import('./actions');
 
   let branchHQ: { id: string };
@@ -113,7 +115,18 @@ describe('Inventory Actions & Security', async () => {
     await prisma.user.deleteMany({
       where: { email: { in: ['hq@test.local', 'other@test.local'] } },
     });
-    await prisma.product.deleteMany({ where: { sku: 'TEST-SKU-1' } });
+    await prisma.product.deleteMany({
+      where: {
+        sku: {
+          in: [
+            'TEST-SKU-1',
+            'TEST-SKU-NO-TAX',
+            'TEST-SKU-WITH-TAX',
+            'TEST-SKU-EMPTY-STRINGS',
+          ],
+        },
+      },
+    });
     await prisma.user.upsert({
       where: { email: 'hq@test.local' },
       update: {
@@ -174,11 +187,102 @@ describe('Inventory Actions & Security', async () => {
     await prisma.branchStock.deleteMany({
       where: { branchId: { in: [branchHQ.id, branchOther.id] } },
     });
-    await prisma.product.deleteMany({ where: { sku: 'TEST-SKU-1' } });
+    await prisma.product.deleteMany({
+      where: {
+        sku: {
+          in: [
+            'TEST-SKU-1',
+            'TEST-SKU-NO-TAX',
+            'TEST-SKU-WITH-TAX',
+            'TEST-SKU-EMPTY-STRINGS',
+          ],
+        },
+      },
+    });
     await prisma.user.deleteMany({
       where: { email: { in: ['hq@test.local', 'other@test.local'] } },
     });
+    // Clean up taxonomy created in tests
+    await prisma.category.deleteMany({
+      where: { name: { startsWith: 'ActTestCat-' } },
+    });
+    await prisma.brand.deleteMany({
+      where: { name: { startsWith: 'ActTestBrand-' } },
+    });
     await prisma.$disconnect();
+  });
+
+  describe('Products', () => {
+    let testCat: { id: string };
+    let testBrand: { id: string };
+    let testProdId: string;
+
+    beforeAll(async () => {
+      testCat = await prisma.category.create({
+        data: { name: 'ActTestCat-1' },
+      });
+      testBrand = await prisma.brand.create({
+        data: { name: 'ActTestBrand-1' },
+      });
+    });
+
+    it('creates a product without taxonomy', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const prod = await createProduct({
+        sku: 'TEST-SKU-NO-TAX',
+        name: 'No Tax Prod',
+      });
+      assert.ok(prod.id);
+      assert.strictEqual(prod.categoryId, null);
+      assert.strictEqual(prod.brandId, null);
+      testProdId = prod.id;
+    });
+
+    it('updates a product to assign taxonomy', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const prod = await updateProduct(testProdId, {
+        categoryId: testCat.id,
+        brandId: testBrand.id,
+      });
+      assert.strictEqual(prod.categoryId, testCat.id);
+      assert.strictEqual(prod.brandId, testBrand.id);
+    });
+
+    it('updates a product to clear taxonomy using empty strings', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const prod = await updateProduct(testProdId, {
+        categoryId: '',
+        brandId: '',
+      });
+      assert.strictEqual(prod.categoryId, null);
+      assert.strictEqual(prod.brandId, null);
+    });
+
+    it('creates a product with taxonomy', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const prod = await createProduct({
+        sku: 'TEST-SKU-WITH-TAX',
+        name: 'Tax Prod',
+        categoryId: testCat.id,
+        brandId: testBrand.id,
+      });
+      assert.strictEqual(prod.categoryId, testCat.id);
+      assert.strictEqual(prod.brandId, testBrand.id);
+      await prisma.product.delete({ where: { id: prod.id } }); // cleanup
+    });
+
+    it('creates a product mapping empty strings to null', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      const prod = await createProduct({
+        sku: 'TEST-SKU-EMPTY-STRINGS',
+        name: 'Empty Strings Prod',
+        categoryId: '',
+        brandId: '',
+      });
+      assert.strictEqual(prod.categoryId, null);
+      assert.strictEqual(prod.brandId, null);
+      await prisma.product.delete({ where: { id: prod.id } }); // cleanup
+    });
   });
 
   describe('receiveStock', () => {

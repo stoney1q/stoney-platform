@@ -1,6 +1,6 @@
 import { requirePermission } from '@/lib/auth/guard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, ArrowRightLeft, Warehouse, Layers } from 'lucide-react';
+import { Package, ArrowRightLeft, Warehouse, Layers, Tags } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -84,6 +84,24 @@ export default async function InventoryPage() {
             <Link href="/inventory/transfers">
               <Button variant="outline" className="w-full">
                 View Transfers
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taxonomy</CardTitle>
+            <Tags className="text-muted-foreground h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Categories</div>
+            <p className="text-muted-foreground mb-4 text-xs">
+              Manage product classifications
+            </p>
+            <Link href="/inventory/taxonomy">
+              <Button variant="outline" className="w-full">
+                View Taxonomy
               </Button>
             </Link>
           </CardContent>
