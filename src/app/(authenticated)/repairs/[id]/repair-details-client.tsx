@@ -19,6 +19,7 @@ import {
   returnRepairPart,
   cancelRepair,
 } from '@/lib/repairs/actions';
+import { RepairMediaCard } from '@/components/media/repair-media-card';
 import type {
   Customer,
   Device,
@@ -428,6 +429,9 @@ export function RepairDetailsClient({
           </TableBody>
         </Table>
       </div>
+      
+      {/* Media Card */}
+      <RepairMediaCard repairId={repair.id} isFinalized={isFinalized} />
     </div>
   );
 }

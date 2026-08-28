@@ -11,6 +11,7 @@ import {
   TransferStatus,
   ProductType,
 } from '../../generated/prisma/client';
+import { storage } from '../media/storage';
 
 /**
  * Validates product SKU uniqueness
@@ -401,3 +402,32 @@ export async function cancelTransfer(transferId: string) {
     });
   });
 }
+
+export async function deleteProduct(productId: string) {
+  await requirePermission('inventory:write');
+
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: { media: true }
+  });
+  if (!product) return;
+
+  // Cleanup media in GCS
+  for (const asset of product.media) {
+    try {
+      await storage.deleteObject(asset.path);
+    } catch (e) {
+      console.error('Failed to delete GCS object during product deletion:', e);
+    }
+  }
+
+  // Prisma relation is Restrict, so we must manually delete MediaAsset records first
+  return await prisma.$transaction(async (tx) => {
+    await tx.mediaAsset.deleteMany({ where: { productId } });
+    // This will fail if there are other Restrict relations (like BranchStock, StockMovement, etc) 
+    // Wait, are they Restrict? In the schema they are Cascade! (BranchStock, StockMovement, SaleItem, etc)
+    // Only category/brand are Restrict (from product TO category).
+    return await tx.product.delete({ where: { id: productId } });
+  });
+}
+
