@@ -9,6 +9,7 @@ import {
 } from 'firebase-admin/app';
 
 import { getAuth, type Auth } from 'firebase-admin/auth';
+import { getStorage, type Storage } from 'firebase-admin/storage';
 
 /**
  * Build-time enforcement: the `server-only` import above will cause a
@@ -95,6 +96,7 @@ export function getFirebaseAdminApp(): App {
   return initializeApp({
     credential,
     projectId: projectId || undefined,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   });
 }
 
@@ -105,4 +107,13 @@ export function getFirebaseAdminApp(): App {
 export function getFirebaseAdminAuth(): Auth {
   const app = getFirebaseAdminApp();
   return getAuth(app);
+}
+
+/**
+ * Returns the server-side Firebase Admin Storage singleton instance.
+ * Initializes the Admin app if not already initialized.
+ */
+export function getFirebaseAdminStorage(): Storage {
+  const app = getFirebaseAdminApp();
+  return getStorage(app);
 }

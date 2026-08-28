@@ -28,9 +28,10 @@ model Branch {
   sales                Sale[]
   repairs              Repair[]
 
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
   quotations Quotation[]
+  media      MediaAsset[]
 }
 
 model Role {
@@ -95,9 +96,10 @@ model User {
   repairsAssigned  Repair[]
   repairLogs       RepairLog[]
 
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  quotations Quotation[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  quotations    Quotation[]
+  uploadedMedia MediaAsset[] @relation("CreatedMedia")
 
   @@index([email])
   @@index([firebaseUid])
@@ -153,12 +155,13 @@ model Product {
   transfers    Transfer[]
   repairParts  RepairPart[]
 
-  category     Category?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  brand        Brand?          @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: Restrict)
 
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   quotationItems QuotationItem[]
+  media          MediaAsset[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -269,7 +272,7 @@ model Customer {
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
 
-  sales Sale[]
+  sales   Sale[]
   repairs Repair[]
   devices Device[]
 
@@ -312,7 +315,7 @@ model Sale {
   subtotal Decimal @default(0) @db.Decimal(10, 2)
   total    Decimal @default(0) @db.Decimal(10, 2)
 
-  quotationId String?    @unique
+  quotationId String? @unique
   repairId    String?
 
   items    SaleItem[]
@@ -454,53 +457,55 @@ enum RepairStatus {
 }
 
 model Device {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   customerId   String
   make         String
   model        String
   serialNumber String?
   notes        String?
 
-  customer     Customer @relation(fields: [customerId], references: [id])
-  repairs      Repair[]
+  customer Customer @relation(fields: [customerId], references: [id])
+  repairs  Repair[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([customerId, serialNumber])
   @@index([customerId])
 }
 
 model Repair {
-  id                String       @id @default(cuid())
-  sequence          Int          @unique @default(autoincrement())
-  version           Int          @default(1)
-  status            RepairStatus @default(RECEIVED)
+  id       String       @id @default(cuid())
+  sequence Int          @unique @default(autoincrement())
+  version  Int          @default(1)
+  status   RepairStatus @default(RECEIVED)
 
   branchId          String
   customerId        String
   deviceId          String
   technicianId      String?
-  activeQuotationId String?      @unique
+  activeQuotationId String? @unique
 
-  issue             String
-  notes             String?
+  issue String
+  notes String?
 
-  branch            Branch       @relation(fields: [branchId], references: [id])
-  customer          Customer     @relation(fields: [customerId], references: [id])
-  device            Device       @relation(fields: [deviceId], references: [id])
-  technician        User?        @relation(fields: [technicianId], references: [id])
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
+  device     Device   @relation(fields: [deviceId], references: [id])
+  technician User?    @relation(fields: [technicianId], references: [id])
 
-  activeQuotation   Quotation?   @relation("ActiveRepairQuotation", fields: [activeQuotationId], references: [id])
-  allQuotations     Quotation[]  @relation("RepairQuotations")
-  sales             Sale[]       @relation("RepairSales")
+  activeQuotation Quotation?  @relation("ActiveRepairQuotation", fields: [activeQuotationId], references: [id])
+  allQuotations   Quotation[] @relation("RepairQuotations")
+  sales           Sale[]      @relation("RepairSales")
 
-  parts             RepairPart[]
-  logs              RepairLog[]
+  parts RepairPart[]
+  logs  RepairLog[]
 
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  completedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  media MediaAsset[]
 
   @@index([branchId, status])
   @@index([customerId])
@@ -508,36 +513,36 @@ model Repair {
 }
 
 model RepairPart {
-  id               String   @id @default(cuid())
-  version          Int      @default(1)
-  repairId         String
-  productId        String
+  id        String @id @default(cuid())
+  version   Int    @default(1)
+  repairId  String
+  productId String
 
-  plannedQuantity  Int      @default(0)
-  consumedQuantity Int      @default(0)
-  returnedQuantity Int      @default(0)
+  plannedQuantity  Int @default(0)
+  consumedQuantity Int @default(0)
+  returnedQuantity Int @default(0)
 
-  repair           Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  product          Product  @relation(fields: [productId], references: [id])
+  repair  Repair  @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([repairId, productId])
 }
 
 model RepairLog {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   repairId      String
   userId        String
   previousState RepairStatus?
   newState      RepairStatus
   notes         String?
 
-  repair        Repair       @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  user          User         @relation(fields: [userId], references: [id])
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
 
-  createdAt     DateTime     @default(now())
+  createdAt DateTime @default(now())
 }
 
 // ==========================================
@@ -545,21 +550,63 @@ model RepairLog {
 // ==========================================
 
 model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id   String @id @default(cuid())
+  name String @unique
 
-  products  Product[]
+  products Product[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Brand {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id   String @id @default(cuid())
+  name String @unique
 
-  products  Product[]
+  products Product[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// MEDIA DOMAIN
+// ==========================================
+
+enum MediaState {
+  PENDING
+  READY
+  ERROR
+}
+
+model MediaAsset {
+  id        String     @id @default(cuid())
+  state     MediaState @default(PENDING)
+  bucket    String
+  path      String
+  url       String?
+  mimeType  String
+  sizeBytes Int
+  fileName  String
+  isPublic  Boolean    @default(false)
+
+  createdById String
+  branchId    String?
+
+  productId String?
+  repairId  String?
+
+  createdBy User     @relation("CreatedMedia", fields: [createdById], references: [id])
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  repair    Repair?  @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bucket, path])
+  @@index([state, createdAt])
+  @@index([productId])
+  @@index([repairId])
+  @@index([branchId])
 }

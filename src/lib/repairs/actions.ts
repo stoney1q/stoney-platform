@@ -18,6 +18,7 @@ import {
   updateDeviceSchema,
 } from './validation';
 import { RepairStatus, MovementType } from '@/generated/prisma/client';
+import { storage } from '../media/storage';
 
 export async function createRepair(formData: FormData) {
   const session = await requireAuth();
@@ -663,5 +664,36 @@ export async function deleteDevice(deviceId: string) {
 
   return prisma.device.delete({
     where: { id: device.id },
+  });
+}
+
+export async function deleteRepair(repairId: string, version: number) {
+  await requireAuth();
+  await requirePermission('repairs:delete');
+
+  const repair = await prisma.repair.findUnique({
+    where: { id: repairId },
+    include: { media: true }
+  });
+
+  if (!repair) return;
+
+  await requireBranchAccess(repair.branchId);
+
+  // Cleanup media in GCS
+  for (const asset of repair.media) {
+    try {
+      await storage.deleteObject(asset.path);
+    } catch (e) {
+      console.error('Failed to delete GCS object during repair deletion:', e);
+    }
+  }
+
+  // Delete DB records
+  return await prisma.$transaction(async (tx) => {
+    await tx.mediaAsset.deleteMany({ where: { repairId } });
+    return await tx.repair.delete({
+      where: { id: repairId, version }
+    });
   });
 }

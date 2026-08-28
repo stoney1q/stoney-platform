@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ProductFormDialog } from './product-form';
+import { ProductMediaDialog } from './product-media-dialog';
 import { getCategories, getBrands } from '@/lib/inventory/taxonomy-actions';
 import Link from 'next/link';
 
@@ -138,9 +139,12 @@ export default async function ProductsPage({
                     {product.createdAt.toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">
-                      Edit
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <ProductMediaDialog productId={product.id} productName={product.name} />
+                      <Button variant="ghost" size="sm">
+                        Edit
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
