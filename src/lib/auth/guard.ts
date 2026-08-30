@@ -1,5 +1,5 @@
 import 'server-only';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 import {
   getFirebaseAdminAuth,
@@ -44,30 +44,53 @@ export async function getCurrentUser(
     return null;
   }
 
-  let sessionCookie = sessionCookieOverride;
-  if (!sessionCookie) {
-    try {
-      const cookieStore = await cookies();
-      sessionCookie = cookieStore.get(AUTH_COOKIE_NAME)?.value;
-    } catch {
-      // Invoked outside of Next.js request context
-      return null;
-    }
-  }
-
-  if (!sessionCookie) {
-    return null;
-  }
+  let firebaseUid: string;
+  let tokenEmail: string | undefined;
+  let emailVerified: boolean;
 
   try {
     const adminAuth = getFirebaseAdminAuth();
-    // verifySessionCookie with checkRevoked = true ensures revoked tokens/sessions are rejected
-    const decodedToken = await adminAuth.verifySessionCookie(
-      sessionCookie,
-      true
-    );
-    const firebaseUid = decodedToken.uid;
-    const tokenEmail = decodedToken.email;
+        // Support Bearer Token for API Routes
+    let authHeader: string | null = null;
+    try {
+      const headersList = await headers();
+      authHeader = headersList.get('authorization');
+    } catch {
+      // Ignore if headers() throws outside of Next.js context
+    }
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split('Bearer ')[1];
+      const decodedToken = await adminAuth.verifyIdToken(token, true);
+      firebaseUid = decodedToken.uid;
+      tokenEmail = decodedToken.email;
+      emailVerified = decodedToken.email_verified || false;
+    } else {
+      // Fallback to Session Cookie for UI/Server Actions
+      let sessionCookie = sessionCookieOverride;
+      if (!sessionCookie) {
+        try {
+          const cookieStore = await cookies();
+          sessionCookie = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+        } catch {
+          // Invoked outside of Next.js request context
+          return null;
+        }
+      }
+
+      if (!sessionCookie) {
+        return null;
+      }
+
+      // verifySessionCookie with checkRevoked = true ensures revoked tokens/sessions are rejected
+      const decodedToken = await adminAuth.verifySessionCookie(
+        sessionCookie,
+        true
+      );
+      firebaseUid = decodedToken.uid;
+      tokenEmail = decodedToken.email;
+      emailVerified = Boolean(decodedToken.email_verified);
+    }
 
     // 1. Primary lookup by immutable Firebase UID
     let dbUser = await prisma.user.findUnique({
@@ -105,7 +128,7 @@ export async function getCurrentUser(
       });
 
       if (userByEmail && !userByEmail.firebaseUid) {
-        if (!decodedToken.email_verified) {
+        if (!emailVerified) {
           throw new AuthError(
             'Email must be verified before claiming a provisioned account.',
             403,
@@ -118,7 +141,7 @@ export async function getCurrentUser(
           where: { id: userByEmail.id },
           data: {
             firebaseUid,
-            emailVerified: Boolean(decodedToken.email_verified),
+            emailVerified: emailVerified,
           },
           include: {
             branch: true,
