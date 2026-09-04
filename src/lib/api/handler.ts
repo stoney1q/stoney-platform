@@ -12,11 +12,11 @@ const corsHeaders = {
 
 type ApiHandler = (
   req: NextRequest,
-  context: { params: Promise<Record<string, string>> | Record<string, string> }
+  context: unknown
 ) => Promise<NextResponse> | NextResponse;
 
 export function apiHandler(handler: ApiHandler) {
-  return async (req: NextRequest, context: { params: Promise<Record<string, string>> | Record<string, string> }) => {
+  return async (req: NextRequest, context: unknown) => {
     // Handle OPTIONS requests automatically for CORS
     if (req.method === 'OPTIONS') {
       return NextResponse.json({}, { headers: corsHeaders });
@@ -37,7 +37,7 @@ export function apiHandler(handler: ApiHandler) {
 
       // 2. Execute Handler
       const response = await handler(req, context);
-      
+
       // Append CORS headers to the successful response
       Object.entries(corsHeaders).forEach(([key, value]) => {
         response.headers.set(key, value);
@@ -57,7 +57,7 @@ export function apiHandler(handler: ApiHandler) {
 
       if (error instanceof ZodError) {
         return NextResponse.json(
-          { error: 'Validation failed', details: (error as ZodError).errors },
+          { error: 'Validation failed', details: (error as unknown as { errors?: unknown[], issues?: unknown[] }).errors || error.issues },
           { status: 400, headers: corsHeaders }
         );
       }
