@@ -112,9 +112,13 @@ describe('Inventory Actions & Security', async () => {
     await prisma.branchStock.deleteMany({
       where: { branchId: { in: [branchHQ.id, branchOther.id] } },
     });
-    await prisma.user.deleteMany({
-      where: { email: { in: ['hq@test.local', 'other@test.local'] } },
-    });
+    try {
+      await prisma.user.deleteMany({
+        where: { email: { in: ['hq@test.local', 'other@test.local'] } },
+      });
+    } catch {
+      // Ignore shared user cleanup errors
+    }
     await prisma.product.deleteMany({
       where: {
         sku: {
@@ -199,9 +203,13 @@ describe('Inventory Actions & Security', async () => {
         },
       },
     });
-    await prisma.user.deleteMany({
-      where: { email: { in: ['hq@test.local', 'other@test.local'] } },
-    });
+    try {
+      await prisma.user.deleteMany({
+        where: { email: { in: ['hq@test.local', 'other@test.local'] } },
+      });
+    } catch {
+      // Ignore shared user cleanup errors
+    }
     // Clean up taxonomy created in tests
     await prisma.category.deleteMany({
       where: { name: { startsWith: 'ActTestCat-' } },

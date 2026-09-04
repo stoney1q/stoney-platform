@@ -277,6 +277,10 @@ const FOUNDATIONAL_PERMISSIONS: PermissionDefinition[] = [
     description:
       'Global bypass of branch isolation for administrative operations',
   },
+  {
+    name: 'ai:access',
+    description: 'Access the AI Co-Pilot assistant for operational insights',
+  },
 ];
 
 // ==========================================
@@ -332,6 +336,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'reports:export',
     'settings:read',
     'settings:update',
+    'ai:access',
   ],
   Manager: [
     'dashboard:read',
@@ -365,6 +370,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'reports:read',
     'reports:export',
     'settings:read',
+    'ai:access',
   ],
   Technician: [
     'dashboard:read',
@@ -376,6 +382,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'repairs:update',
     'quotations:read',
     'quotations:create',
+    'ai:access',
   ],
   Sales: [
     'dashboard:read',
@@ -393,6 +400,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'quotations:read',
     'quotations:create',
     'quotations:update',
+    'ai:access',
   ],
   Cashier: [
     'dashboard:read',
@@ -417,6 +425,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'suppliers:create',
     'suppliers:update',
     'reports:read',
+    'ai:access',
   ],
 };
 
