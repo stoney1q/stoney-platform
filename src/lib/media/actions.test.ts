@@ -151,7 +151,7 @@ describe('Media Actions & Security', async () => {
     });
     await prisma.repair.deleteMany({ where: { id: otherRepair.id } });
     await prisma.device.deleteMany({ where: { id: hqDevice.id } });
-    await prisma.customer.deleteMany({ where: { createdById: hqUser.id } });
+    await prisma.customer.deleteMany({ where: { id: hqCustomer.id } });
     await prisma.product.deleteMany({ where: { sku: 'TEST-PROD-MEDIA' } });
     await prisma.product.deleteMany({ where: { sku: 'TEST-DEL-MEDIA' } });
     try {

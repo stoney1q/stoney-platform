@@ -697,3 +697,35 @@ export async function deleteRepair(repairId: string, version: number) {
     });
   });
 }
+
+/**
+ * AI Tool / Diagnostic Service
+ * Fetches active repairs for a device model in the current branch.
+ */
+export async function getActiveRepairDiagnostics(branchId: string, deviceModel: string, limit: number = 10) {
+  // Ensure the user has the foundational permission
+  await requirePermission('repairs:read');
+
+  // Ensure the user actually has access to this branch
+  await requireBranchAccess(branchId);
+
+  return await prisma.repair.findMany({
+    where: {
+      branchId,
+      device: {
+        model: {
+          contains: deviceModel,
+          mode: 'insensitive',
+        },
+      },
+      status: {
+        notIn: ['COMPLETED', 'DELIVERED', 'CANCELLED'],
+      },
+    },
+    include: {
+      device: true,
+    },
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+  });
+}

@@ -424,10 +424,47 @@ export async function deleteProduct(productId: string) {
   // Prisma relation is Restrict, so we must manually delete MediaAsset records first
   return await prisma.$transaction(async (tx) => {
     await tx.mediaAsset.deleteMany({ where: { productId } });
-    // This will fail if there are other Restrict relations (like BranchStock, StockMovement, etc) 
+    // This will fail if there are other Restrict relations (like BranchStock, StockMovement, etc)
     // Wait, are they Restrict? In the schema they are Cascade! (BranchStock, StockMovement, SaleItem, etc)
     // Only category/brand are Restrict (from product TO category).
     return await tx.product.delete({ where: { id: productId } });
   });
 }
 
+/**
+ * AI Tool / Diagnostic Service
+ * Fetches inventory items that are running low on stock or out of stock for a specific branch.
+ */
+export async function getLowStockItems(branchId: string, limit: number = 10) {
+  // Ensure the user has the foundational permission
+  await requirePermission('inventory:read');
+
+  // Ensure the user actually has access to this branch
+  await requireBranchAccess(branchId);
+
+  // Prisma doesn't support comparing two fields (onHand <= reorderLevel) directly in the where clause
+  // So we query the ids using raw sql, then fetch the full relations
+  const rawResults = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "BranchStock"
+    WHERE "branchId" = ${branchId}
+      AND "onHand" <= "reorderLevel"
+    LIMIT ${limit}
+  `;
+
+  if (rawResults.length === 0) return [];
+
+  return await prisma.branchStock.findMany({
+    where: {
+      id: { in: rawResults.map(r => r.id) }
+    },
+    include: {
+      product: {
+        include: {
+          category: true,
+          brand: true,
+        },
+      },
+    },
+  });
+}
