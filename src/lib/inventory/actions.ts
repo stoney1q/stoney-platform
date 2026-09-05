@@ -67,45 +67,6 @@ export async function updateProduct(
   });
 }
 
-export async function createSupplier(data: {
-  name: string;
-  contactName?: string;
-  email?: string;
-  phone?: string;
-}) {
-  await requirePermission('inventory:write');
-
-  return await prisma.supplier.create({
-    data,
-  });
-}
-
-export async function updateSupplier(
-  id: string,
-  data: { name?: string; contactName?: string; email?: string; phone?: string }
-) {
-  await requirePermission('inventory:write');
-
-  return await prisma.supplier.update({
-    where: { id },
-    data,
-  });
-}
-
-export async function linkProductSupplier(data: {
-  productId: string;
-  supplierId: string;
-  supplierSku?: string;
-  unitCost: number;
-  isPreferred?: boolean;
-}) {
-  await requirePermission('inventory:write');
-
-  return await prisma.productSupplier.create({
-    data,
-  });
-}
-
 /**
  * Receive stock into a branch (Positive increment)
  */
@@ -410,7 +371,7 @@ export async function deleteProduct(productId: string) {
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { media: true }
+    include: { media: true },
   });
   if (!product) return;
 
@@ -462,7 +423,7 @@ export async function getLowStockItems(branchId: string, limit: number = 10) {
 
   return await prisma.branchStock.findMany({
     where: {
-      id: { in: rawResults.map(r => r.id) }
+      id: { in: rawResults.map((r) => r.id) },
     },
     include: {
       product: {
