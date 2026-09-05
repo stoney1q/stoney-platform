@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePermission,
   requireBranchAccess,
+  requireGlobalAccess,
 } from '@/lib/auth/guard';
 import {
   createSaleSchema,
@@ -31,17 +32,26 @@ export async function searchSales(options: {
   query?: string;
   page?: number;
   status?: SaleStatus;
+  branchId?: string;
 }) {
   const session = await requireAuth();
   await requirePermission('sales:read');
 
-  const { query, page = 1, status } = options;
+  const { query, page = 1, status, branchId } = options;
   const pageSize = 10;
   const skip = (page - 1) * pageSize;
 
-  const where: Prisma.SaleWhereInput = {
-    branchId: session.branchId,
-  };
+  const targetBranchId = branchId || session.branchId;
+  if (targetBranchId === 'all') {
+    await requireGlobalAccess(session);
+  } else {
+    await requireBranchAccess(targetBranchId);
+  }
+
+  const where: Prisma.SaleWhereInput = {};
+  if (targetBranchId !== 'all') {
+    where.branchId = targetBranchId;
+  }
 
   if (status) {
     where.status = status;
@@ -128,12 +138,14 @@ export async function createSale(formData: FormData) {
 
   const rawData = {
     customerId: formData.get('customerId') as string,
+    branchId: (formData.get('branchId') as string) || undefined,
   };
 
   const data = createSaleSchema.parse(rawData);
 
-  // The branchId is securely derived from the authenticated PostgreSQL User context.
-  const branchId = session.branchId;
+  // The branchId is securely derived from the authenticated PostgreSQL User context, or explicitly provided
+  const branchId = data.branchId || session.branchId;
+  await requireBranchAccess(branchId);
 
   return prisma.sale.create({
     data: {

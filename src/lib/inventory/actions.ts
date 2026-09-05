@@ -5,11 +5,13 @@ import {
   requireAuth,
   requireBranchAccess,
   requirePermission,
+  requireGlobalAccess,
 } from '../auth/guard';
 import {
   MovementType,
   TransferStatus,
   ProductType,
+  Prisma,
 } from '../../generated/prisma/client';
 import { storage } from '../media/storage';
 
@@ -438,17 +440,21 @@ export async function deleteProduct(productId: string) {
 export async function getLowStockItems(branchId: string, limit: number = 10) {
   // Ensure the user has the foundational permission
   await requirePermission('inventory:read');
+  const session = await requireAuth();
 
-  // Ensure the user actually has access to this branch
-  await requireBranchAccess(branchId);
+  if (branchId === 'all') {
+    await requireGlobalAccess(session);
+  } else {
+    // Ensure the user actually has access to this branch
+    await requireBranchAccess(branchId);
+  }
 
   // Prisma doesn't support comparing two fields (onHand <= reorderLevel) directly in the where clause
   // So we query the ids using raw sql, then fetch the full relations
   const rawResults = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT "id"
     FROM "BranchStock"
-    WHERE "branchId" = ${branchId}
-      AND "onHand" <= "reorderLevel"
+    WHERE ${branchId === 'all' ? Prisma.empty : Prisma.sql`"branchId" = ${branchId} AND`} "onHand" <= "reorderLevel"
     LIMIT ${limit}
   `;
 

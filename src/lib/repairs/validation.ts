@@ -2,10 +2,11 @@ import { z } from 'zod';
 import { RepairStatus } from '@/generated/prisma/client';
 
 export const createRepairSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  deviceId: z.string().min(1, 'Device is required'),
-  issue: z.string().min(1, 'Issue description is required'),
+  customerId: z.string().min(1, 'Customer ID is required'),
+  deviceId: z.string().min(1, 'Device ID is required'),
+  issue: z.string().min(1, 'Issue is required'),
   notes: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 export const updateRepairStatusSchema = z.object({

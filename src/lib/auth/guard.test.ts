@@ -41,7 +41,7 @@ vi.mock('../firebase/admin', () => ({
 }));
 
 describe('Authentication & Security', async () => {
-  const { requireAuth, requireRole, requirePermission, requireBranchAccess } =
+  const { requireAuth, requireRole, requirePermission, requireBranchAccess, requireGlobalAccess } =
     await import('./guard');
   const prisma = (await import('../prisma')).default;
 
@@ -373,6 +373,80 @@ describe('Authentication & Security', async () => {
       // The check happens against targetBranchId
       await assert.rejects(
         requireBranchAccess(branchOther.id),
+        (err: Error & { code?: string }) => err.code === 'FORBIDDEN'
+      );
+    });
+  });
+
+  describe('Global Access', () => {
+    it('Super Admin -> allowed', async () => {
+      // Temporarily give activeUser Super Admin role
+      await prisma.user.update({
+        where: { id: activeUser.id },
+        data: { roleId: roleSuperAdmin.id },
+      });
+
+      currentMockCookie.value = 'valid_active';
+      mockVerifySessionCookie = async () => ({
+        uid: 'firebase_active_uid',
+        email: 'active@test.local',
+        email_verified: true,
+      });
+
+      const user = await requireAuth();
+      await assert.doesNotReject(requireGlobalAccess(user));
+
+      // Restore role
+      await prisma.user.update({
+        where: { id: activeUser.id },
+        data: { roleId: roleManager.id },
+      });
+    });
+
+    it('admin:global permission -> allowed', async () => {
+      // Temporarily add admin:global permission to roleManager
+      const globalPerm = await prisma.permission.findFirst({
+        where: { name: 'admin:global' },
+      });
+      let addedPerm = false;
+      if (globalPerm) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: roleManager.id, permissionId: globalPerm.id } },
+          create: { roleId: roleManager.id, permissionId: globalPerm.id },
+          update: {},
+        });
+        addedPerm = true;
+      }
+
+      currentMockCookie.value = 'valid_active';
+      mockVerifySessionCookie = async () => ({
+        uid: 'firebase_active_uid',
+        email: 'active@test.local',
+        email_verified: true,
+      });
+
+      const user = await requireAuth();
+      await assert.doesNotReject(requireGlobalAccess(user));
+
+      // Cleanup
+      if (globalPerm && addedPerm) {
+        await prisma.rolePermission.delete({
+          where: { roleId_permissionId: { roleId: roleManager.id, permissionId: globalPerm.id } },
+        });
+      }
+    });
+
+    it('Standard user (Branch Manager) without global permission -> 403', async () => {
+      currentMockCookie.value = 'valid_active';
+      mockVerifySessionCookie = async () => ({
+        uid: 'firebase_active_uid',
+        email: 'active@test.local',
+        email_verified: true,
+      });
+
+      const user = await requireAuth();
+      await assert.rejects(
+        requireGlobalAccess(user),
         (err: Error & { code?: string }) => err.code === 'FORBIDDEN'
       );
     });

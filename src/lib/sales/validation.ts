@@ -7,6 +7,7 @@ export const moneySchema = z.coerce
 
 export const createSaleSchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
+  branchId: z.string().optional(),
 });
 
 export const addSaleItemSchema = z.object({

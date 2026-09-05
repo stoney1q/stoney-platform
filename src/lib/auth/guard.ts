@@ -293,6 +293,27 @@ export async function requireBranchAccess(
 }
 
 /**
+ * Enforces global administrative access across all branches.
+ * Throws 403 AuthError if the user is not a Super Admin and lacks 'admin:global'.
+ */
+export async function requireGlobalAccess(
+  user?: AuthenticatedUser
+): Promise<AuthenticatedUser> {
+  const currentUser = user || (await requireAuth());
+  if (
+    currentUser.role.name === 'Super Admin' ||
+    currentUser.permissions.includes('admin:global')
+  ) {
+    return currentUser;
+  }
+  throw new AuthError(
+    'Access denied. Global administrative privileges are required for this action.',
+    403,
+    'FORBIDDEN'
+  );
+}
+
+/**
  * Ensures the authenticated user can assign the target role.
  * Throws 403 AuthError if the target role contains permissions the user lacks.
  */

@@ -3,6 +3,7 @@ import { QuotationStatus } from '@/generated/prisma/client';
 
 export const createQuotationSchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
+  branchId: z.string().optional(),
 });
 
 export const addQuotationItemSchema = z.object({
