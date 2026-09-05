@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePermission,
   requireBranchAccess,
+  requireGlobalAccess,
 } from '@/lib/auth/guard';
 import {
   createQuotationSchema,
@@ -24,17 +25,26 @@ export async function searchQuotations(options: {
   query?: string;
   page?: number;
   status?: QuotationStatus;
+  branchId?: string;
 }) {
   const session = await requireAuth();
   await requirePermission('quotations:read');
 
-  const { query, page = 1, status } = options;
+  const { query, page = 1, status, branchId } = options;
   const pageSize = 10;
   const skip = (page - 1) * pageSize;
 
-  const where: Prisma.QuotationWhereInput = {
-    branchId: session.branchId,
-  };
+  const targetBranchId = branchId || session.branchId;
+  if (targetBranchId === 'all') {
+    await requireGlobalAccess(session);
+  } else {
+    await requireBranchAccess(targetBranchId);
+  }
+
+  const where: Prisma.QuotationWhereInput = {};
+  if (targetBranchId !== 'all') {
+    where.branchId = targetBranchId;
+  }
 
   if (status) {
     where.status = status;
@@ -119,10 +129,13 @@ export async function createQuotation(formData: FormData) {
 
   const rawData = {
     customerId: formData.get('customerId') as string,
+    branchId: (formData.get('branchId') as string) || undefined,
   };
 
   const data = createQuotationSchema.parse(rawData);
-  const branchId = session.branchId;
+
+  const branchId = data.branchId || session.branchId;
+  await requireBranchAccess(branchId);
 
   return prisma.quotation.create({
     data: {

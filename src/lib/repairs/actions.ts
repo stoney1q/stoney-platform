@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePermission,
   requireBranchAccess,
+  requireGlobalAccess,
 } from '@/lib/auth/guard';
 import {
   createRepairSchema,
@@ -17,7 +18,7 @@ import {
   createDeviceSchema,
   updateDeviceSchema,
 } from './validation';
-import { RepairStatus, MovementType } from '@/generated/prisma/client';
+import { RepairStatus, MovementType, Prisma } from '@/generated/prisma/client';
 import { storage } from '../media/storage';
 
 export async function createRepair(formData: FormData) {
@@ -29,9 +30,13 @@ export async function createRepair(formData: FormData) {
     deviceId: formData.get('deviceId') as string,
     issue: formData.get('issue') as string,
     notes: (formData.get('notes') as string) || undefined,
+    branchId: (formData.get('branchId') as string) || undefined,
   };
 
   const data = createRepairSchema.parse(rawData);
+
+  const branchId = data.branchId || session.branchId;
+  await requireBranchAccess(branchId);
 
   // Validate the device belongs to the customer
   const device = await prisma.device.findUnique({
@@ -44,7 +49,7 @@ export async function createRepair(formData: FormData) {
   return prisma.$transaction(async (tx) => {
     const repair = await tx.repair.create({
       data: {
-        branchId: session.branchId,
+        branchId: branchId,
         customerId: data.customerId,
         deviceId: data.deviceId,
         issue: data.issue,
@@ -86,7 +91,7 @@ export async function updateRepairStatus(formData: FormData) {
 
     await requireBranchAccess(repair.branchId);
 
-    if (
+    if(
       repair.status === RepairStatus.COMPLETED ||
       repair.status === RepairStatus.DELIVERED ||
       repair.status === RepairStatus.CANCELLED
@@ -441,41 +446,46 @@ export async function searchRepairs(params: {
   query?: string;
   page?: number;
   status?: RepairStatus;
+  branchId?: string;
 }) {
   const session = await requireAuth();
   await requirePermission('repairs:read');
 
-  const page = params.page || 1;
-  const limit = 20;
-  const skip = (page - 1) * limit;
+  const { query, page = 1, status, branchId } = params;
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
 
-  const where = {
-    branchId: session.branchId,
-    ...(params.status ? { status: params.status } : {}),
-    ...(params.query
-      ? {
-          OR: [
-            { id: { contains: params.query, mode: 'insensitive' as const } },
-            {
-              customer: {
-                firstName: {
-                  contains: params.query,
-                  mode: 'insensitive' as const,
-                },
-              },
-            },
-            {
-              customer: {
-                lastName: {
-                  contains: params.query,
-                  mode: 'insensitive' as const,
-                },
-              },
-            },
-          ],
-        }
-      : {}),
-  };
+  const targetBranchId = branchId || session.branchId;
+  if (targetBranchId === 'all') {
+    await requireGlobalAccess(session);
+  } else {
+    await requireBranchAccess(targetBranchId);
+  }
+
+  const where: Prisma.RepairWhereInput = {};
+  if (targetBranchId !== 'all') {
+    where.branchId = targetBranchId;
+  }
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (query) {
+    where.OR = [
+      { id: { contains: query, mode: 'insensitive' as const } },
+      {
+        customer: {
+          firstName: { contains: query, mode: 'insensitive' as const },
+        },
+      },
+      {
+        customer: {
+          lastName: { contains: query, mode: 'insensitive' as const },
+        },
+      },
+    ];
+  }
 
   const [total, repairs] = await Promise.all([
     prisma.repair.count({ where }),
@@ -488,7 +498,7 @@ export async function searchRepairs(params: {
       },
       orderBy: { createdAt: 'desc' },
       skip,
-      take: limit,
+      take: pageSize,
     }),
   ]);
 
@@ -497,7 +507,7 @@ export async function searchRepairs(params: {
     data: {
       repairs,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / pageSize),
       currentPage: page,
     },
   };
@@ -537,7 +547,7 @@ export async function getRepairById(id: string) {
 
 export async function getCustomerDevices(customerId: string) {
   await requireAuth();
-  await requirePermission('repairs:read'); // or whatever read permission is appropriate
+  await requirePermission('repairs:read');
 
   const devices = await prisma.device.findMany({
     where: { customerId },
@@ -561,7 +571,6 @@ export async function createDevice(formData: FormData) {
 
   const data = createDeviceSchema.parse(rawData);
 
-  // Check if customer exists
   const customer = await prisma.customer.findUnique({
     where: { id: data.customerId },
   });
@@ -570,7 +579,6 @@ export async function createDevice(formData: FormData) {
     throw new Error('Customer not found');
   }
 
-  // If serial number is provided, check for uniqueness for this customer
   if (data.serialNumber) {
     const existing = await prisma.device.findUnique({
       where: {
@@ -680,7 +688,6 @@ export async function deleteRepair(repairId: string, version: number) {
 
   await requireBranchAccess(repair.branchId);
 
-  // Cleanup media in GCS
   for (const asset of repair.media) {
     try {
       await storage.deleteObject(asset.path);
@@ -689,7 +696,6 @@ export async function deleteRepair(repairId: string, version: number) {
     }
   }
 
-  // Delete DB records
   return await prisma.$transaction(async (tx) => {
     await tx.mediaAsset.deleteMany({ where: { repairId } });
     return await tx.repair.delete({
@@ -698,30 +704,29 @@ export async function deleteRepair(repairId: string, version: number) {
   });
 }
 
-/**
- * AI Tool / Diagnostic Service
- * Fetches active repairs for a device model in the current branch.
- */
 export async function getActiveRepairDiagnostics(branchId: string, deviceModel: string, limit: number = 10) {
-  // Ensure the user has the foundational permission
+  const session = await requireAuth();
   await requirePermission('repairs:read');
 
-  // Ensure the user actually has access to this branch
-  await requireBranchAccess(branchId);
+  if (branchId === 'all') {
+    await requireGlobalAccess(session);
+  } else {
+    await requireBranchAccess(branchId);
+  }
+
+  const where: Prisma.RepairWhereInput = {
+    device: { model: { contains: deviceModel, mode: 'insensitive' } },
+    status: {
+      notIn: ['COMPLETED', 'DELIVERED', 'CANCELLED'],
+    },
+  };
+
+  if (branchId !== 'all') {
+    where.branchId = branchId;
+  }
 
   return await prisma.repair.findMany({
-    where: {
-      branchId,
-      device: {
-        model: {
-          contains: deviceModel,
-          mode: 'insensitive',
-        },
-      },
-      status: {
-        notIn: ['COMPLETED', 'DELIVERED', 'CANCELLED'],
-      },
-    },
+    where,
     include: {
       device: true,
     },

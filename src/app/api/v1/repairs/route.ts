@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { apiHandler } from '@/lib/api/handler';
-import { requireAuth, requirePermission, requireBranchAccess } from '@/lib/auth/guard';
+import { requireAuth, requirePermission } from '@/lib/auth/guard';
 import { searchRepairs, createRepair } from '@/lib/repairs/actions';
 import { toSafeRepairDTO, RepairWithRelations } from '@/lib/repairs/dtos';
 import { RepairStatus } from '@/generated/prisma/client';
@@ -19,6 +19,7 @@ const createBodySchema = z.object({
   deviceId: z.string().min(1, 'Device ID is required'),
   issue: z.string().min(1, 'Issue description is required'),
   notes: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -34,14 +35,11 @@ export const GET = apiHandler(async (req: NextRequest) => {
     branchId: url.searchParams.get('branchId') || undefined,
   });
 
-  if (parsed.branchId) {
-    await requireBranchAccess(parsed.branchId);
-  }
-
   const result = await searchRepairs({
     query: parsed.query,
     page: parsed.page,
     status: parsed.status,
+    branchId: parsed.branchId,
   });
 
   const repairs = result.data.repairs as unknown as RepairWithRelations[];
@@ -72,6 +70,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
   formData.append('issue', parsed.issue);
   if (parsed.notes) {
     formData.append('notes', parsed.notes);
+  }
+  if (parsed.branchId) {
+    formData.append('branchId', parsed.branchId);
   }
 
   const repair = await createRepair(formData);

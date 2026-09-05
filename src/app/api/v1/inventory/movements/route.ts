@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { apiHandler } from '@/lib/api/handler';
 import prisma from '@/lib/prisma';
-import { requireAuth, requirePermission, requireBranchAccess } from '@/lib/auth/guard';
+import { requireAuth, requirePermission, requireBranchAccess, requireGlobalAccess } from '@/lib/auth/guard';
 import { toSafeStockMovementDTO, StockMovementWithProduct } from '@/lib/inventory/dtos';
-import { MovementType } from '@/generated/prisma/client';
+import { MovementType, Prisma } from '@/generated/prisma/client';
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -25,27 +25,28 @@ export const GET = apiHandler(async (req: NextRequest) => {
     type: url.searchParams.get('type') || undefined,
   });
 
-  const hasGlobal = user.role.name === 'Super Admin' || user.permissions.includes('admin:global');
+  const targetBranchId = parsed.branchId || user.branchId;
 
-  if (parsed.branchId) {
-    await requireBranchAccess(parsed.branchId);
-  }
-
-  const branchId = hasGlobal && parsed.branchId ? parsed.branchId : user.branchId;
-
-  if (!branchId) {
+  if (!targetBranchId) {
     return NextResponse.json({ error: 'User is not assigned to a branch' }, { status: 400 });
   }
 
-  await requireBranchAccess(branchId);
+  if (targetBranchId === 'all') {
+    await requireGlobalAccess(user);
+  } else {
+    await requireBranchAccess(targetBranchId);
+  }
 
   const { page, limit, type } = parsed;
   const skip = (page - 1) * limit;
 
-  const where = {
-    branchId,
+  const where: Prisma.StockMovementWhereInput = {
     ...(type ? { type } : {}),
   };
+
+  if (targetBranchId !== 'all') {
+    where.branchId = targetBranchId;
+  }
 
   const [total, movements] = await Promise.all([
     prisma.stockMovement.count({ where }),

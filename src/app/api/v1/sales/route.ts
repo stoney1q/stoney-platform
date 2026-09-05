@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { apiHandler } from '@/lib/api/handler';
-import { requireAuth, requirePermission, requireBranchAccess } from '@/lib/auth/guard';
+import { requireAuth, requirePermission } from '@/lib/auth/guard';
 import { searchSales, createSale } from '@/lib/sales/actions';
 import { toSafeSaleDTO, SaleWithItems } from '@/lib/sales/dtos';
 import { SaleStatus } from '@/generated/prisma/client';
@@ -16,6 +16,7 @@ const querySchema = z.object({
 
 const createBodySchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
+  branchId: z.string().optional(),
 });
 
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -31,14 +32,11 @@ export const GET = apiHandler(async (req: NextRequest) => {
     branchId: url.searchParams.get('branchId') || undefined,
   });
 
-  if (parsed.branchId) {
-    await requireBranchAccess(parsed.branchId);
-  }
-
   const result = await searchSales({
     query: parsed.query,
     page: parsed.page,
     status: parsed.status,
+    branchId: parsed.branchId,
   });
 
   const sales = result.data.sales as unknown as SaleWithItems[];
@@ -65,6 +63,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const formData = new FormData();
   formData.append('customerId', parsed.customerId);
+  if (parsed.branchId) {
+    formData.append('branchId', parsed.branchId);
+  }
 
   const sale = await createSale(formData);
 
