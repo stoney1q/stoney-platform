@@ -161,7 +161,14 @@ export async function createSale(formData: FormData) {
 }
 
 export async function addSaleItem(formData: FormData) {
-  await requirePermission('sales:create');
+  const session = await requireAuth();
+  if (
+    session.role.name !== 'Super Admin' &&
+    !session.permissions.includes('sales:create') &&
+    !session.permissions.includes('sales:update')
+  ) {
+    await requirePermission('sales:create');
+  }
 
   const rawData = {
     saleId: formData.get('saleId') as string,
@@ -240,7 +247,14 @@ export async function addSaleItem(formData: FormData) {
 }
 
 export async function removeSaleItem(formData: FormData) {
-  await requirePermission('sales:create');
+  const session = await requireAuth();
+  if (
+    session.role.name !== 'Super Admin' &&
+    !session.permissions.includes('sales:create') &&
+    !session.permissions.includes('sales:update')
+  ) {
+    await requirePermission('sales:create');
+  }
 
   const rawData = {
     saleId: formData.get('saleId') as string,
@@ -297,6 +311,9 @@ export async function applyPayment(formData: FormData) {
   const data = applyPaymentSchema.parse(rawData);
 
   return prisma.$transaction(async (tx) => {
+    // Lock the Sale row to prevent concurrent payment race conditions
+    await tx.$executeRaw`SELECT 1 FROM "Sale" WHERE id = ${data.saleId} FOR UPDATE`;
+
     const sale = await tx.sale.findUniqueOrThrow({
       where: { id: data.saleId },
       include: { items: true, payments: true },
@@ -382,7 +399,14 @@ export async function applyPayment(formData: FormData) {
 }
 
 export async function cancelSale(formData: FormData) {
-  await requirePermission('sales:delete');
+  const session = await requireAuth();
+  if (
+    session.role.name !== 'Super Admin' &&
+    !session.permissions.includes('sales:cancel') &&
+    !session.permissions.includes('sales:delete')
+  ) {
+    await requirePermission('sales:cancel');
+  }
 
   const data = cancelSaleSchema.parse({
     saleId: formData.get('saleId'),
