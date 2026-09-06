@@ -196,6 +196,16 @@ const FOUNDATIONAL_PERMISSIONS: PermissionDefinition[] = [
     description: 'Archive or delete supplier profiles',
   },
 
+  // Purchases / Procurement
+  {
+    name: 'purchases:read',
+    description: 'View purchase orders and procurement history',
+  },
+  {
+    name: 'purchases:write',
+    description: 'Create, update, receive, and cancel purchase orders',
+  },
+
   // Repairs
   {
     name: 'repairs:read',

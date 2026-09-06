@@ -68,6 +68,50 @@ export async function updateProduct(
   });
 }
 
+export async function applyStockReceipt(
+  tx: Prisma.TransactionClient,
+  params: {
+    branchId: string;
+    productId: string;
+    quantity: number;
+    userId: string;
+    reason: string;
+    referenceId?: string | null;
+  }
+) {
+  // Upsert the BranchStock
+  const stock = await tx.branchStock.upsert({
+    where: {
+      branchId_productId: {
+        branchId: params.branchId,
+        productId: params.productId,
+      },
+    },
+    update: { onHand: { increment: params.quantity } },
+    create: {
+      branchId: params.branchId,
+      productId: params.productId,
+      onHand: params.quantity,
+      reserved: 0,
+    },
+  });
+
+  // Create movement
+  await tx.stockMovement.create({
+    data: {
+      branchId: params.branchId,
+      productId: params.productId,
+      quantity: params.quantity,
+      type: MovementType.RECEIPT,
+      userId: params.userId,
+      reason: params.reason,
+      referenceId: params.referenceId || null,
+    },
+  });
+
+  return stock;
+}
+
 /**
  * Receive stock into a branch (Positive increment)
  */
@@ -94,27 +138,14 @@ export async function receiveStock(
   }
 
   return await prisma.$transaction(async (tx) => {
-    // Upsert the BranchStock
-    const stock = await tx.branchStock.upsert({
-      where: { branchId_productId: { branchId, productId } },
-      update: { onHand: { increment: quantity } },
-      create: { branchId, productId, onHand: quantity, reserved: 0 },
+    return await applyStockReceipt(tx, {
+      branchId,
+      productId,
+      quantity,
+      userId: user.id,
+      reason: reason || 'Direct stock receipt',
+      referenceId: supplierId,
     });
-
-    // Create movement
-    await tx.stockMovement.create({
-      data: {
-        branchId,
-        productId,
-        quantity,
-        type: MovementType.RECEIPT,
-        userId: user.id,
-        reason: reason || 'Direct stock receipt',
-        referenceId: supplierId || null,
-      },
-    });
-
-    return stock;
   });
 }
 

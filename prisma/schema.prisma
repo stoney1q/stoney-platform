@@ -28,10 +28,11 @@ model Branch {
   sales                Sale[]
   repairs              Repair[]
 
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  quotations Quotation[]
-  media      MediaAsset[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  quotations     Quotation[]
+  media          MediaAsset[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model Role {
@@ -96,10 +97,11 @@ model User {
   repairsAssigned  Repair[]
   repairLogs       RepairLog[]
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  quotations    Quotation[]
-  uploadedMedia MediaAsset[] @relation("CreatedMedia")
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  quotations            Quotation[]
+  uploadedMedia         MediaAsset[]    @relation("CreatedMedia")
+  purchaseOrdersCreated PurchaseOrder[]
 
   @@index([email])
   @@index([firebaseUid])
@@ -158,10 +160,11 @@ model Product {
   category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: Restrict)
 
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  quotationItems QuotationItem[]
-  media          MediaAsset[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  quotationsItems    QuotationItem[]
+  media              MediaAsset[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -174,7 +177,8 @@ model Supplier {
   email       String?
   phone       String?
 
-  products ProductSupplier[]
+  products       ProductSupplier[]
+  purchaseOrders PurchaseOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -252,6 +256,63 @@ model Transfer {
 
   @@index([originId, status])
   @@index([destinationId, status])
+}
+
+// ==========================================
+// PROCUREMENT / PURCHASES DOMAIN
+// ==========================================
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id       String              @id @default(cuid())
+  sequence Int                 @unique @default(autoincrement())
+  status   PurchaseOrderStatus @default(DRAFT)
+
+  branchId    String
+  supplierId  String
+  createdById String
+
+  total Decimal @default(0) @db.Decimal(10, 2)
+  notes String?
+
+  items PurchaseOrderItem[]
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  supplier  Supplier @relation(fields: [supplierId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  orderedAt  DateTime?
+  receivedAt DateTime?
+
+  @@index([branchId, status, createdAt])
+  @@index([supplierId])
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+
+  sku         String
+  productName String
+
+  orderedQuantity  Int
+  receivedQuantity Int @default(0)
+
+  unitCost Decimal @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(10, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
 }
 
 // ==========================================
