@@ -13,6 +13,7 @@ import {
   FileText,
   Settings,
   BarChart3,
+  ShoppingCart,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -76,6 +77,12 @@ export const NAVIGATION_CONFIG: NavigationItem[] = [
     href: '/suppliers',
     icon: Truck,
     permission: 'suppliers:read',
+  },
+  {
+    label: 'Purchases',
+    href: '/purchases',
+    icon: ShoppingCart,
+    permission: 'purchases:read',
   },
   {
     label: 'Repairs',
