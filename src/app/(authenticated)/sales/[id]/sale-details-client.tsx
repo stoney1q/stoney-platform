@@ -19,14 +19,15 @@ import {
 } from '@/lib/sales/actions';
 import {
   Customer,
-  Sale,
   SaleItem,
+  Sale,
   Payment,
   Product,
   BranchStock,
   Category,
   Brand,
 } from '@/generated/prisma/client';
+import { ReturnItemDialog } from './return-item-dialog';
 
 type SaleWithRelations = Sale & {
   customer: Customer;
@@ -336,6 +337,18 @@ export function SaleDetailsClient({
                         >
                           Remove
                         </Button>
+                      </TableCell>
+                    )}
+                    {sale.status === 'COMPLETED' && (
+                      <TableCell className="text-right">
+                        {item.returnedQuantity < item.quantity && (
+                          <ReturnItemDialog sale={sale} item={item} />
+                        )}
+                        {item.returnedQuantity > 0 && (
+                          <span className="ml-2 text-xs font-medium text-orange-600">
+                            {item.returnedQuantity} Returned
+                          </span>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>

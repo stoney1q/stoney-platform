@@ -1,9 +1,26 @@
 import { z } from 'zod';
-import { PaymentMethod } from '@/generated/prisma/client';
+import { PaymentMethod, Prisma } from '@/generated/prisma/client';
 
-export const moneySchema = z.coerce
-  .number()
-  .min(0, 'Amount must be a non-negative value');
+export const moneySchema = z
+  .union([z.string(), z.number()])
+  .transform((val) => {
+    try {
+      const str = val.toString();
+      const decimal = new Prisma.Decimal(str);
+      if (decimal.isNegative()) {
+        throw new Error('Amount must be a non-negative value');
+      }
+      return str;
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        e.message === 'Amount must be a non-negative value'
+      ) {
+        throw e;
+      }
+      throw new Error('Invalid monetary amount');
+    }
+  });
 
 export const createSaleSchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
@@ -17,7 +34,7 @@ export const addSaleItemSchema = z.object({
     .number()
     .int('Quantity must be a whole number')
     .positive('Quantity must be greater than zero'),
-  discount: moneySchema.default(0),
+  discount: moneySchema.default('0'),
 });
 
 export const removeSaleItemSchema = z.object({
@@ -27,7 +44,7 @@ export const removeSaleItemSchema = z.object({
 
 export const applyPaymentSchema = z.object({
   saleId: z.string().min(1, 'Sale ID is required'),
-  amount: z.number().positive('Payment amount must be greater than zero'),
+  amount: moneySchema,
   method: z.nativeEnum(PaymentMethod, {
     message: 'Invalid payment method',
   }),
@@ -36,4 +53,17 @@ export const applyPaymentSchema = z.object({
 
 export const cancelSaleSchema = z.object({
   saleId: z.string().min(1, 'Sale ID is required'),
+});
+
+export const returnSaleItemSchema = z.object({
+  saleId: z.string().min(1, 'Sale ID is required'),
+  saleItemId: z.string().min(1, 'Sale Item ID is required'),
+  quantity: z
+    .number()
+    .int('Quantity must be a whole number')
+    .positive('Quantity must be greater than zero'),
+  refundAmount: moneySchema,
+  refundMethod: z.nativeEnum(PaymentMethod, {
+    message: 'Invalid payment method',
+  }),
 });

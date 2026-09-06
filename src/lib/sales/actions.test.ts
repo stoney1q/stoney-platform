@@ -49,7 +49,7 @@ vi.mock('../firebase/admin', () => ({
 
 describe('Sales Foundation Actions', async () => {
   const { prisma } = await import('../prisma');
-  const { createSale, addSaleItem, applyPayment, cancelSale } =
+  const { createSale, addSaleItem, applyPayment, cancelSale, returnSaleItem } =
     await import('./actions');
 
   let mainBranchId: string;
@@ -122,7 +122,12 @@ describe('Sales Foundation Actions', async () => {
     });
     otherUserId = otherUser.id;
 
-    const perms = ['sales:create', 'payments:create', 'sales:delete'];
+    const perms = [
+      'sales:create',
+      'payments:create',
+      'sales:delete',
+      'sales:update',
+    ];
     for (const p of perms) {
       const perm = await prisma.permission.upsert({
         where: { name: p },
@@ -559,5 +564,290 @@ describe('Sales Foundation Actions', async () => {
     formData.append('quantity', '1');
 
     await assert.rejects(addSaleItem(formData), /Access denied/);
+  });
+
+  // --- Returns & Refunds (Hardened) ---
+
+  it('can partially return an item and restore inventory precisely', async () => {
+    currentMockCookie.value = 'active_cashier';
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId,
+        branchId: mainBranchId,
+        createdById: cashierUserId,
+        status: SaleStatus.COMPLETED,
+        total: new Prisma.Decimal(300.0),
+      },
+    });
+    const item = await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: product1Id,
+        sku: 'TEST-PROD-1',
+        productName: 'Product 1',
+        quantity: 3,
+        unitPrice: 100.0,
+        subtotal: 300.0,
+        total: 300.0,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        amount: 300.0,
+        method: PaymentMethod.CARD,
+        createdById: cashierUserId,
+      },
+    });
+
+    const initialStock = await prisma.branchStock.findUniqueOrThrow({
+      where: {
+        branchId_productId: { branchId: mainBranchId, productId: product1Id },
+      },
+    });
+
+    const formData = new FormData();
+    formData.append('saleId', sale.id);
+    formData.append('saleItemId', item.id);
+    formData.append('quantity', '1');
+    formData.append('refundAmount', '100.00');
+    formData.append('refundMethod', PaymentMethod.CARD);
+
+    await returnSaleItem(formData);
+
+    const currentStock = await prisma.branchStock.findUniqueOrThrow({
+      where: {
+        branchId_productId: { branchId: mainBranchId, productId: product1Id },
+      },
+    });
+    assert.strictEqual(currentStock.onHand, initialStock.onHand + 1);
+
+    const updatedItem = await prisma.saleItem.findUniqueOrThrow({
+      where: { id: item.id },
+    });
+    assert.strictEqual(updatedItem.returnedQuantity, 1);
+
+    const payments = await prisma.payment.findMany({
+      where: { saleId: sale.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    assert.strictEqual(payments.length, 2);
+    assert.strictEqual(payments[1].amount.toString(), '-100');
+  });
+
+  it('rejects returning more than sold quantity', async () => {
+    currentMockCookie.value = 'active_cashier';
+    const sale = await prisma.sale.create({
+      data: {
+        customerId,
+        branchId: mainBranchId,
+        createdById: cashierUserId,
+        status: SaleStatus.COMPLETED,
+        total: new Prisma.Decimal(100.0),
+      },
+    });
+    const item = await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: product1Id,
+        sku: 'TEST-1',
+        productName: 'P1',
+        quantity: 1,
+        unitPrice: 100.0,
+        subtotal: 100.0,
+        total: 100.0,
+      },
+    });
+
+    const formData = new FormData();
+    formData.append('saleId', sale.id);
+    formData.append('saleItemId', item.id);
+    formData.append('quantity', '2');
+    formData.append('refundAmount', '200.00');
+    formData.append('refundMethod', PaymentMethod.CARD);
+
+    await assert.rejects(
+      returnSaleItem(formData),
+      /Return quantity exceeds returnable quantity/
+    );
+  });
+
+  it('rejects cross-item over-refunding (refunding cheap item for entire sale value)', async () => {
+    currentMockCookie.value = 'active_cashier';
+
+    const sale = await prisma.sale.create({
+      data: {
+        customerId,
+        branchId: mainBranchId,
+        createdById: cashierUserId,
+        status: SaleStatus.COMPLETED,
+        total: new Prisma.Decimal(2010.0),
+        subtotal: new Prisma.Decimal(2010.0),
+      },
+    });
+
+    // Expensive item ($2000)
+    await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: product1Id,
+        sku: 'EXP',
+        productName: 'Expensive',
+        quantity: 1,
+        unitPrice: 2000.0,
+        subtotal: 2000.0,
+        total: 2000.0,
+      },
+    });
+
+    // Cheap item ($10)
+    const cheapItem = await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: product1Id,
+        sku: 'CHP',
+        productName: 'Cheap',
+        quantity: 1,
+        unitPrice: 10.0,
+        subtotal: 10.0,
+        total: 10.0,
+      },
+    });
+
+    await prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        amount: 2010.0,
+        method: PaymentMethod.CASH,
+        createdById: cashierUserId,
+      },
+    });
+
+    const formData = new FormData();
+    formData.append('saleId', sale.id);
+    formData.append('saleItemId', cheapItem.id);
+    formData.append('quantity', '1');
+    formData.append('refundAmount', '2010.00'); // Trying to refund the entire sale for the $10 item!
+    formData.append('refundMethod', PaymentMethod.CASH);
+
+    await assert.rejects(
+      returnSaleItem(formData),
+      /Refund amount exceeds the refundable value of the returned items/
+    );
+  });
+
+  it('rolls back the entire transaction if BranchStock is missing (Phantom Inventory fix)', async () => {
+    currentMockCookie.value = 'active_cashier';
+    const sale = await prisma.sale.create({
+      data: {
+        customerId,
+        branchId: mainBranchId,
+        createdById: cashierUserId,
+        status: SaleStatus.COMPLETED,
+        total: new Prisma.Decimal(100.0),
+      },
+    });
+
+    // Create a product that has NO BranchStock record in mainBranchId
+    const ghostProduct = await prisma.product.create({
+      data: { name: 'Ghost', sku: `GHOST-${Date.now()}`, sellingPrice: 100.0 },
+    });
+    const item = await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: ghostProduct.id,
+        sku: 'GHOST-1',
+        productName: 'Ghost',
+        quantity: 1,
+        unitPrice: 100.0,
+        subtotal: 100.0,
+        total: 100.0,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        amount: 100.0,
+        method: PaymentMethod.CASH,
+        createdById: cashierUserId,
+      },
+    });
+
+    const formData = new FormData();
+    formData.append('saleId', sale.id);
+    formData.append('saleItemId', item.id);
+    formData.append('quantity', '1');
+    formData.append('refundAmount', '100.00');
+    formData.append('refundMethod', PaymentMethod.CASH);
+
+    await assert.rejects(
+      returnSaleItem(formData),
+      /BranchStock record missing/
+    );
+
+    // Verify atomicity (nothing was mutated)
+    const updatedItem = await prisma.saleItem.findUniqueOrThrow({
+      where: { id: item.id },
+    });
+    assert.strictEqual(updatedItem.returnedQuantity, 0); // Not updated
+
+    const payments = await prisma.payment.findMany({
+      where: { saleId: sale.id },
+    });
+    assert.strictEqual(payments.length, 1); // Negative payment was NOT recorded
+
+    const movements = await prisma.stockMovement.findMany({
+      where: { referenceId: sale.id, type: MovementType.RETURN },
+    });
+    assert.strictEqual(movements.length, 0); // No stock movement recorded
+  });
+
+  it('handles precision-sensitive decimal amounts flawlessly', async () => {
+    currentMockCookie.value = 'active_cashier';
+    const sale = await prisma.sale.create({
+      data: {
+        customerId,
+        branchId: mainBranchId,
+        createdById: cashierUserId,
+        status: SaleStatus.COMPLETED,
+        total: new Prisma.Decimal(9999.99),
+        subtotal: new Prisma.Decimal(9999.99),
+      },
+    });
+    const item = await prisma.saleItem.create({
+      data: {
+        saleId: sale.id,
+        productId: product1Id,
+        sku: 'PRECISION',
+        productName: 'Precision',
+        quantity: 3,
+        unitPrice: 3333.33,
+        subtotal: 9999.99,
+        total: 9999.99,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        saleId: sale.id,
+        amount: 9999.99,
+        method: PaymentMethod.CASH,
+        createdById: cashierUserId,
+      },
+    });
+
+    const formData = new FormData();
+    formData.append('saleId', sale.id);
+    formData.append('saleItemId', item.id);
+    formData.append('quantity', '1');
+    formData.append('refundAmount', '3333.33'); // Precision float test
+    formData.append('refundMethod', PaymentMethod.CASH);
+
+    await returnSaleItem(formData); // Should succeed without IEEE-754 precision failures
+
+    const updatedItem = await prisma.saleItem.findUniqueOrThrow({
+      where: { id: item.id },
+    });
+    assert.strictEqual(updatedItem.returnedQuantity, 1);
   });
 });
