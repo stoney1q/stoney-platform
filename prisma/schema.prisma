@@ -352,6 +352,8 @@ model SaleItem {
   subtotal  Decimal @db.Decimal(10, 2)
   total     Decimal @db.Decimal(10, 2)
 
+  returnedQuantity Int @default(0)
+
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
 
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)

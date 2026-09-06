@@ -13,6 +13,7 @@ import {
   removeSaleItemSchema,
   applyPaymentSchema,
   cancelSaleSchema,
+  returnSaleItemSchema,
 } from './validation';
 import {
   Prisma,
@@ -174,7 +175,7 @@ export async function addSaleItem(formData: FormData) {
     saleId: formData.get('saleId') as string,
     productId: formData.get('productId') as string,
     quantity: Number(formData.get('quantity')),
-    discount: Number(formData.get('discount') || 0),
+    discount: (formData.get('discount') as string) || '0',
   };
 
   const data = addSaleItemSchema.parse(rawData);
@@ -303,7 +304,7 @@ export async function applyPayment(formData: FormData) {
 
   const rawData = {
     saleId: formData.get('saleId') as string,
-    amount: Number(formData.get('amount')),
+    amount: formData.get('amount') as string,
     method: formData.get('method') as PaymentMethod,
     reference: (formData.get('reference') as string) || undefined,
   };
@@ -435,5 +436,131 @@ export async function cancelSale(formData: FormData) {
         cancelledAt: new Date(),
       },
     });
+  });
+}
+
+export async function returnSaleItem(formData: FormData) {
+  const session = await requireAuth();
+  if (
+    session.role.name !== 'Super Admin' &&
+    !session.permissions.includes('sales:update')
+  ) {
+    await requirePermission('sales:update');
+  }
+
+  const rawData = {
+    saleId: formData.get('saleId') as string,
+    saleItemId: formData.get('saleItemId') as string,
+    quantity: Number(formData.get('quantity')),
+    refundAmount: (formData.get('refundAmount') as string) || '0',
+    refundMethod: formData.get('refundMethod') as PaymentMethod,
+  };
+
+  const data = returnSaleItemSchema.parse(rawData);
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Lock Sale
+    await tx.$executeRaw`SELECT 1 FROM "Sale" WHERE id = ${data.saleId} FOR UPDATE`;
+
+    // 2. Fetch Sale
+    const sale = await tx.sale.findUniqueOrThrow({
+      where: { id: data.saleId },
+      include: { items: true, payments: true },
+    });
+
+    if (sale.status !== SaleStatus.COMPLETED) {
+      throw new Error('Can only return items from a completed sale');
+    }
+
+    await requireBranchAccess(sale.branchId);
+
+    // 3. Find SaleItem
+    const item = sale.items.find((i) => i.id === data.saleItemId);
+    if (!item) {
+      throw new Error('Sale item not found');
+    }
+
+    // 4. Validate return quantity
+    const remainingReturnable = item.quantity - item.returnedQuantity;
+    if (data.quantity > remainingReturnable) {
+      throw new Error('Return quantity exceeds returnable quantity');
+    }
+
+    // 5. Validate refund amount
+    const netPayments = sale.payments.reduce(
+      (sum, p) => sum.add(p.amount),
+      new Prisma.Decimal(0)
+    );
+    const refundAmount = new Prisma.Decimal(data.refundAmount);
+
+    const lineRefund = item.total.dividedBy(item.quantity);
+    const ratio = sale.subtotal.greaterThan(0)
+      ? sale.total.dividedBy(sale.subtotal)
+      : new Prisma.Decimal(1);
+
+    const maxRefundForItem = lineRefund
+      .times(ratio)
+      .times(data.quantity)
+      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+
+    if (refundAmount.greaterThan(maxRefundForItem)) {
+      throw new Error(
+        'Refund amount exceeds the refundable value of the returned items'
+      );
+    }
+
+    if (refundAmount.greaterThan(netPayments)) {
+      throw new Error('Refund amount exceeds total net payments for this sale');
+    }
+
+    // 6. Update SaleItem
+    await tx.saleItem.update({
+      where: { id: item.id },
+      data: {
+        returnedQuantity: item.returnedQuantity + data.quantity,
+      },
+    });
+
+    // 7. Restore Inventory for GOODS
+    if (item.productType === ProductType.GOODS) {
+      const result = await tx.$executeRaw`
+        UPDATE "BranchStock"
+        SET "onHand" = "onHand" + ${data.quantity},
+            "updatedAt" = NOW()
+        WHERE "branchId" = ${sale.branchId}
+          AND "productId" = ${item.productId}
+      `;
+
+      if (result === 0) {
+        throw new Error(
+          'BranchStock record missing. Inventory could not be restored.'
+        );
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          branchId: sale.branchId,
+          productId: item.productId,
+          quantity: data.quantity,
+          type: MovementType.RETURN,
+          referenceId: sale.id,
+          reason: 'Customer Return',
+          userId: session.id,
+        },
+      });
+    }
+
+    // 8. Record Financial Refund (Negative Payment)
+    if (refundAmount.greaterThan(0)) {
+      await tx.payment.create({
+        data: {
+          saleId: sale.id,
+          amount: refundAmount.negated(),
+          method: data.refundMethod,
+          reference: 'Refund',
+          createdById: session.id,
+        },
+      });
+    }
   });
 }
