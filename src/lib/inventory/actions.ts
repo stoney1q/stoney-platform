@@ -14,6 +14,7 @@ import {
   Prisma,
 } from '../../generated/prisma/client';
 import { storage } from '../media/storage';
+import { receiveStockSchema, adjustStockSchema } from './validation';
 
 /**
  * Validates product SKU uniqueness
@@ -74,12 +75,23 @@ export async function receiveStock(
   branchId: string,
   productId: string,
   quantity: number,
-  reason?: string
+  reason?: string,
+  supplierId?: string
 ) {
   const user = await requireBranchAccess(branchId);
   await requirePermission('inventory:write');
 
-  if (quantity <= 0) throw new Error('Quantity must be greater than zero');
+  receiveStockSchema.parse({ branchId, productId, quantity, supplierId });
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw new Error('Product not found');
+
+  if (supplierId) {
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: supplierId },
+    });
+    if (!supplier) throw new Error('Supplier not found');
+  }
 
   return await prisma.$transaction(async (tx) => {
     // Upsert the BranchStock
@@ -97,7 +109,8 @@ export async function receiveStock(
         quantity,
         type: MovementType.RECEIPT,
         userId: user.id,
-        reason,
+        reason: reason || 'Direct stock receipt',
+        referenceId: supplierId || null,
       },
     });
 
@@ -117,8 +130,10 @@ export async function adjustStock(
   const user = await requireBranchAccess(branchId);
   await requirePermission('inventory:write');
 
-  if (quantity === 0) throw new Error('Quantity cannot be zero');
-  if (!reason) throw new Error('Reason is required for adjustments');
+  adjustStockSchema.parse({ branchId, productId, quantity, reason });
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw new Error('Product not found');
 
   return await prisma.$transaction(async (tx) => {
     if (quantity > 0) {

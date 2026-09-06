@@ -8,7 +8,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { StockActions } from './stock-actions';
+import { StockRowActions } from './stock-row-actions';
 import { redirect } from 'next/navigation';
 
 export default async function StockPage() {
@@ -33,6 +34,16 @@ export default async function StockPage() {
     orderBy: [{ branch: { name: 'asc' } }, { product: { name: 'asc' } }],
   });
 
+  const products = await prisma.product.findMany({
+    select: { id: true, sku: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
+  const suppliers = await prisma.supplier.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -42,7 +53,11 @@ export default async function StockPage() {
             Current on-hand inventory balances.
           </p>
         </div>
-        <Button>Adjust Stock</Button>
+        <StockActions
+          products={products}
+          suppliers={suppliers}
+          currentBranchId={user.branchId}
+        />
       </div>
 
       <div className="rounded-md border">
@@ -82,9 +97,12 @@ export default async function StockPage() {
                     {item.onHand - item.reserved}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">
-                      Details
-                    </Button>
+                    <StockRowActions
+                      productId={item.productId}
+                      productName={item.product.name}
+                      branchId={item.branchId}
+                      onHand={item.onHand}
+                    />
                   </TableCell>
                 </TableRow>
               ))

@@ -319,6 +319,39 @@ describe('Inventory Actions & Security', async () => {
         (err: Error) => err.message.includes('Access denied')
       );
     });
+
+    it('rejects invalid inputs via Zod schema (negative receive)', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        receiveStock(branchHQ.id, productA.id, -10),
+        (err: Error) =>
+          err.message.includes('too_small') ||
+          err.message.includes('greater than zero') ||
+          err.message.includes('invalid_type')
+      );
+    });
+
+    it('rejects non-existent product', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        receiveStock(branchHQ.id, 'does-not-exist', 10),
+        (err: Error) => err.message.includes('Product not found')
+      );
+    });
+
+    it('rejects non-existent supplier', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        receiveStock(
+          branchHQ.id,
+          productA.id,
+          10,
+          'Testing supplier',
+          'bad-supplier-id'
+        ),
+        (err: Error) => err.message.includes('Supplier not found')
+      );
+    });
   });
 
   describe('adjustStock', () => {
@@ -346,6 +379,33 @@ describe('Inventory Actions & Security', async () => {
       await assert.rejects(
         adjustStock(branchHQ.id, productA.id, -100, 'Too much'),
         (err: Error) => err.message.includes('Insufficient available stock')
+      );
+    });
+
+    it('rejects zero quantity adjustment via Zod', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        adjustStock(branchHQ.id, productA.id, 0, 'Zero adjust'),
+        (err: Error) =>
+          err.message.includes('Quantity cannot be zero') ||
+          err.message.includes('custom')
+      );
+    });
+
+    it('rejects missing reason via Zod', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        adjustStock(branchHQ.id, productA.id, 5, ''),
+        (err: Error) =>
+          err.message.includes('reason') || err.message.includes('too_small')
+      );
+    });
+
+    it('rejects non-existent product', async () => {
+      currentMockCookie.value = 'active_hq_user';
+      await assert.rejects(
+        adjustStock(branchHQ.id, 'does-not-exist', 10, 'Test reason'),
+        (err: Error) => err.message.includes('Product not found')
       );
     });
 
