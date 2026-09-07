@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth/context';
 import { getCurrentUser } from '@/lib/auth/guard';
 import { CopilotDrawer } from '@/components/ui/copilot/copilot-drawer';
+import { StoreSettingsProvider } from '@/lib/settings/context';
+import { getPublicStoreSettings } from '@/lib/settings/actions';
 import './globals.css';
 
 const geistSans = Geist({
@@ -27,6 +29,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const currentUser = await getCurrentUser();
+  const settings = await getPublicStoreSettings();
 
   return (
     <html
@@ -35,8 +38,12 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-slate-950 text-slate-100">
         <AuthProvider initialUser={currentUser}>
-          {children}
-          {currentUser?.permissions.includes('ai:access') && <CopilotDrawer />}
+          <StoreSettingsProvider settings={settings}>
+            {children}
+            {currentUser?.permissions.includes('ai:access') && (
+              <CopilotDrawer />
+            )}
+          </StoreSettingsProvider>
         </AuthProvider>
       </body>
     </html>

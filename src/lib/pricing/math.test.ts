@@ -5,7 +5,10 @@ import { Decimal } from 'decimal.js';
 import {
   calculateLineSubtotal,
   calculateLineTotal,
+  calculateLineTax,
   calculateDocumentSubtotal,
+  calculateDocumentTax,
+  calculateDocumentTotal,
   isValidDiscount,
 } from './math';
 
@@ -33,29 +36,35 @@ describe('Pricing Math Utilities', () => {
   });
 
   describe('calculateLineTotal', () => {
-    it('should subtract discount from subtotal', () => {
-      const result = calculateLineTotal(100, 15);
-      assert.strictEqual(result.toString(), '85');
+    it('should subtract discount from subtotal and add tax', () => {
+      const result = calculateLineTotal(100, 15, 5);
+      assert.strictEqual(result.toString(), '90'); // 100 - 15 + 5
     });
 
-    it('should return 0 if discount is greater than subtotal', () => {
-      const result = calculateLineTotal(100, 150);
-      assert.strictEqual(result.toString(), '0');
+    it('should return tax if discount is greater than subtotal', () => {
+      const result = calculateLineTotal(100, 150, 10);
+      assert.strictEqual(result.toString(), '10'); // 0 + 10
     });
 
     it('should handle floating point math exactly', () => {
-      // 0.3 - 0.2 is 0.09999999999999998 in standard JS
-      const result = calculateLineTotal(0.3, 0.2);
-      assert.strictEqual(result.toString(), '0.1');
+      const result = calculateLineTotal(0.3, 0.2, 0.05);
+      assert.strictEqual(result.toString(), '0.15');
+    });
+  });
+
+  describe('calculateLineTax', () => {
+    it('should correctly calculate line tax', () => {
+      const result = calculateLineTax(100, 0.2);
+      assert.strictEqual(result.toString(), '20');
     });
   });
 
   describe('calculateDocumentSubtotal', () => {
-    it('should sum up all line totals exactly', () => {
+    it('should sum up all line subtotals exactly', () => {
       const items = [
-        { total: 10.5 },
-        { total: '20.25' },
-        { total: new Decimal(5.1) },
+        { subtotal: 10.5 },
+        { subtotal: '20.25' },
+        { subtotal: new Decimal(5.1) },
       ];
 
       const result = calculateDocumentSubtotal(items);
@@ -65,6 +74,26 @@ describe('Pricing Math Utilities', () => {
     it('should return 0 for an empty array', () => {
       const result = calculateDocumentSubtotal([]);
       assert.strictEqual(result.toString(), '0');
+    });
+  });
+
+  describe('calculateDocumentTax', () => {
+    it('should sum up all line tax exactly', () => {
+      const items = [
+        { taxAmount: 1.5 },
+        { taxAmount: '2.25' },
+        { taxAmount: new Decimal(1.1) },
+      ];
+
+      const result = calculateDocumentTax(items);
+      assert.strictEqual(result.toString(), '4.85');
+    });
+  });
+
+  describe('calculateDocumentTotal', () => {
+    it('should calculate document total exactly', () => {
+      const result = calculateDocumentTotal(100, 10, 20);
+      assert.strictEqual(result.toString(), '110'); // 100 - 10 + 20
     });
   });
 

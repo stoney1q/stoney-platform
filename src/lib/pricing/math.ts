@@ -15,20 +15,39 @@ export function calculateLineSubtotal(
 }
 
 /**
- * Calculates the exact line total after applying the discount.
+ * Calculates the exact line tax amount.
+ * @param lineSubtotal The subtotal of the line after line discounts
+ * @param taxRate The decimal tax rate (e.g. 0.20 for 20%)
+ * @returns The tax amount (lineSubtotal * taxRate)
+ */
+export function calculateLineTax(
+  lineSubtotal: Decimal | number | string,
+  taxRate: Decimal | number | string
+): Decimal {
+  const subtotal = new Decimal(lineSubtotal);
+  const rate = new Decimal(taxRate);
+  return subtotal.mul(rate);
+}
+
+/**
+ * Calculates the exact line total after applying the discount and adding tax.
  * @param lineSubtotal The subtotal of the line
  * @param discount The flat monetary discount amount to subtract
- * @returns The total (subtotal - discount), ensuring it does not drop below zero
+ * @param taxAmount The calculated tax amount for the line
+ * @returns The total (subtotal - discount + taxAmount), ensuring subtotal-discount >= 0
  */
 export function calculateLineTotal(
   lineSubtotal: Decimal | number | string,
-  discount: Decimal | number | string
+  discount: Decimal | number | string,
+  taxAmount: Decimal | number | string = 0
 ): Decimal {
   const subtotal = new Decimal(lineSubtotal);
   const discountAmount = new Decimal(discount);
+  const tax = new Decimal(taxAmount);
 
-  const total = subtotal.sub(discountAmount);
-  return total.isNegative() ? new Decimal(0) : total;
+  const discounted = subtotal.sub(discountAmount);
+  const base = discounted.isNegative() ? new Decimal(0) : discounted;
+  return base.add(tax);
 }
 
 /**
@@ -37,12 +56,38 @@ export function calculateLineTotal(
  * @returns The sum of all line totals
  */
 export function calculateDocumentSubtotal(
-  items: { total: Decimal | number | string }[]
+  items: { subtotal: Decimal | number | string }[]
 ): Decimal {
   return items.reduce(
-    (sum, item) => sum.add(new Decimal(item.total)),
+    (sum, item) => sum.add(new Decimal(item.subtotal)),
     new Decimal(0)
   );
+}
+
+export function calculateDocumentTax(
+  items: { taxAmount: Decimal | number | string }[]
+): Decimal {
+  return items.reduce(
+    (sum, item) => sum.add(new Decimal(item.taxAmount)),
+    new Decimal(0)
+  );
+}
+
+/**
+ * Calculates the document final total.
+ */
+export function calculateDocumentTotal(
+  subtotal: Decimal | number | string,
+  discount: Decimal | number | string,
+  taxAmount: Decimal | number | string
+): Decimal {
+  const s = new Decimal(subtotal);
+  const d = new Decimal(discount);
+  const t = new Decimal(taxAmount);
+
+  const discounted = s.sub(d);
+  const base = discounted.isNegative() ? new Decimal(0) : discounted;
+  return base.add(t);
 }
 
 /**

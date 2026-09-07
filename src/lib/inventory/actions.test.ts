@@ -121,6 +121,7 @@ describe('Inventory Actions & Security', async () => {
     }
     await prisma.product.deleteMany({
       where: {
+        sellingPrice: 10,
         sku: {
           in: [
             'TEST-SKU-1',
@@ -171,7 +172,7 @@ describe('Inventory Actions & Security', async () => {
 
     // Setup product
     productA = await prisma.product.create({
-      data: { sku: 'TEST-SKU-1', name: 'Test Product 1' },
+      data: { sellingPrice: 10, sku: 'TEST-SKU-1', name: 'Test Product 1' },
     });
   });
 
@@ -193,6 +194,7 @@ describe('Inventory Actions & Security', async () => {
     });
     await prisma.product.deleteMany({
       where: {
+        sellingPrice: 10,
         sku: {
           in: [
             'TEST-SKU-1',
@@ -237,6 +239,7 @@ describe('Inventory Actions & Security', async () => {
     it('creates a product without taxonomy', async () => {
       currentMockCookie.value = 'active_hq_user';
       const prod = await createProduct({
+        sellingPrice: 10,
         sku: 'TEST-SKU-NO-TAX',
         name: 'No Tax Prod',
       });
@@ -269,6 +272,7 @@ describe('Inventory Actions & Security', async () => {
     it('creates a product with taxonomy', async () => {
       currentMockCookie.value = 'active_hq_user';
       const prod = await createProduct({
+        sellingPrice: 10,
         sku: 'TEST-SKU-WITH-TAX',
         name: 'Tax Prod',
         categoryId: testCat.id,
@@ -282,6 +286,7 @@ describe('Inventory Actions & Security', async () => {
     it('creates a product mapping empty strings to null', async () => {
       currentMockCookie.value = 'active_hq_user';
       const prod = await createProduct({
+        sellingPrice: 10,
         sku: 'TEST-SKU-EMPTY-STRINGS',
         name: 'Empty Strings Prod',
         categoryId: '',

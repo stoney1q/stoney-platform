@@ -26,6 +26,7 @@ import {
   QuotationStatus,
   Sale,
 } from '@/generated/prisma/client';
+import { useStoreSettings } from '@/lib/settings/context';
 import Link from 'next/link';
 
 type QuotationWithRelations = Quotation & {
@@ -46,6 +47,7 @@ export function QuotationDetailsClient({
   availableProducts: ProductWithStock[];
 }) {
   const router = useRouter();
+  const { currencySymbol } = useStoreSettings();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -153,9 +155,17 @@ export function QuotationDetailsClient({
           </div>
         </div>
         <div className="bg-card rounded-lg border p-4">
+          <div className="text-muted-foreground text-sm font-medium">Tax</div>
+          <div className="mt-1 text-lg font-semibold">
+            {currencySymbol}
+            {Number(quotation.taxAmount || 0).toFixed(2)}
+          </div>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
           <div className="text-muted-foreground text-sm font-medium">Total</div>
           <div className="mt-1 text-lg font-semibold">
-            ${Number(quotation.total).toFixed(2)}
+            {currencySymbol}
+            {Number(quotation.total).toFixed(2)}
           </div>
         </div>
         <div className="bg-card rounded-lg border p-4">
@@ -197,8 +207,8 @@ export function QuotationDetailsClient({
                       p.type === 'SERVICE' ? 'Service' : `${stock} in stock`;
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} - ${Number(p.sellingPrice).toFixed(2)} (
-                        {stockLabel})
+                        {p.name} - {currencySymbol}
+                        {Number(p.sellingPrice).toFixed(2)} ({stockLabel})
                       </option>
                     );
                   })}
@@ -216,7 +226,9 @@ export function QuotationDetailsClient({
                 />
               </div>
               <div className="w-24 space-y-2">
-                <label className="text-xs font-medium">Discount ($)</label>
+                <label className="text-xs font-medium">
+                  Discount ({currencySymbol})
+                </label>
                 <input
                   type="number"
                   name="discount"
@@ -243,6 +255,7 @@ export function QuotationDetailsClient({
                 <TableHead className="text-right">Unit Price</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Discount</TableHead>
+                <TableHead className="text-right">Tax</TableHead>
                 <TableHead className="text-right">Line Total</TableHead>
                 {quotation.status === 'DRAFT' && <TableHead></TableHead>}
               </TableRow>
@@ -270,16 +283,23 @@ export function QuotationDetailsClient({
                       {item.productName}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${Number(item.unitPrice).toFixed(2)}
+                      {currencySymbol}
+                      {Number(item.unitPrice).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       {item.quantity}
                     </TableCell>
-                    <TableCell className="text-right">
-                      ${Number(item.discount).toFixed(2)}
+                    <TableCell className="text-right text-red-500">
+                      {currencySymbol}
+                      {Number(item.discount).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${Number(item.total).toFixed(2)}
+                      {currencySymbol}
+                      {Number((item as any).taxAmount || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {currencySymbol}
+                      {Number(item.total).toFixed(2)}
                     </TableCell>
                     {quotation.status === 'DRAFT' && (
                       <TableCell className="text-right">

@@ -1,5 +1,6 @@
 import { requirePermission } from '@/lib/auth/guard';
 import { searchQuotations } from '@/lib/quotations/actions';
+import { getPublicStoreSettings } from '@/lib/settings/actions';
 import {
   Table,
   TableBody,
@@ -26,6 +27,7 @@ export default async function QuotationsPage({
     : undefined;
 
   const result = await searchQuotations({ query, page, status });
+  const settings = await getPublicStoreSettings();
 
   return (
     <div className="space-y-6">
@@ -133,7 +135,8 @@ export default async function QuotationsPage({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    ${quotation.total.toString()}
+                    {settings.currencySymbol}
+                    {quotation.total.toString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Link href={`/quotations/${quotation.id}`}>
