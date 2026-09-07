@@ -22,8 +22,12 @@ vi.mock('../firebase/admin', () => ({
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
-      if (currentMockCookie.value === 'active_hq_user') {
-        return { uid: 'hq_uid', email: 'hq@test.local', email_verified: true };
+      if (currentMockCookie.value === 'active_hq_audit_user') {
+        return {
+          uid: 'hq_audit_uid',
+          email: 'hq_audit@test.local',
+          email_verified: true,
+        };
       }
       if (currentMockCookie.value === 'active_other_user') {
         return {
@@ -93,7 +97,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
 
     try {
       await prisma.user.deleteMany({
-        where: { email: { in: ['hq@test.local'] } },
+        where: { email: { in: ['hq_audit@test.local'] } },
       });
     } catch {}
 
@@ -106,17 +110,17 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     await prisma.user.upsert({
-      where: { email: 'hq@test.local' },
+      where: { email: 'hq_audit@test.local' },
       update: {
-        firebaseUid: 'hq_uid',
+        firebaseUid: 'hq_audit_uid',
         branchId: branchHQ.id,
         roleId: roleManager.id,
       },
       create: {
         firstName: 'HQ',
         lastName: 'User',
-        email: 'hq@test.local',
-        firebaseUid: 'hq_uid',
+        email: 'hq_audit@test.local',
+        firebaseUid: 'hq_audit_uid',
         isActive: true,
         emailVerified: true,
         branchId: branchHQ.id,
@@ -141,7 +145,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
     try {
       await prisma.user.deleteMany({
-        where: { email: { in: ['hq@test.local'] } },
+        where: { email: { in: ['hq_audit@test.local'] } },
       });
     } catch {}
     await prisma.$disconnect();
@@ -151,7 +155,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     let auditId: string;
 
     it('creates an audit', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       // Setup initial stock
       await receiveStock(branchHQ.id, productA.id, 50, 'Initial setup');
       await receiveStock(branchHQ.id, productB.id, 20, 'Initial setup');
@@ -162,7 +166,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     it('upserts counted items', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
 
       // Count 45 of Product A (Shrinkage of 5)
       await upsertAuditItem(auditId, productA.id, 45, 'set');
@@ -182,7 +186,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     it('increments counted items', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       // Add 2 more to Product A using increment mode
       await upsertAuditItem(auditId, productA.id, 2, 'increment');
 
@@ -199,13 +203,13 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     it('transitions to REVIEW', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       const audit = await updateAuditStatus(auditId, 'REVIEW');
       assert.strictEqual(audit.status, 'REVIEW');
     });
 
     it('computes point-in-time variance correctly during completion despite concurrent sales', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
 
       // The current system stock is A: 50, B: 20
       // The counted stock is A: 47, B: 25
@@ -268,7 +272,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     it('rejects changes to COMPLETED audits', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       await assert.rejects(
         updateAuditStatus(auditId, 'IN_PROGRESS'),
         (err: Error) =>
@@ -287,7 +291,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
 
   describe('Concurrency & Security Hardening', () => {
     it('prevents lost updates during concurrent increments (read-modify-write race condition)', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       const audit = await createAudit(branchHQ.id, 'Concurrency Test Audit');
 
       // Simulate 5 concurrent increments of 1 unit
@@ -321,7 +325,7 @@ describe('Inventory Audit Actions & Concurrency', async () => {
     });
 
     it('prevents double completion due to missing explicit row lock', async () => {
-      currentMockCookie.value = 'active_hq_user';
+      currentMockCookie.value = 'active_hq_audit_user';
       const audit = await createAudit(branchHQ.id, 'Double Complete Audit');
 
       await upsertAuditItem(audit.id, productA.id, 5, 'set');

@@ -54,7 +54,10 @@ export function CreateAuditForm({ branches }: { branches: Branch[] }) {
 
           <div className="space-y-2">
             <Label htmlFor="branchId">Branch</Label>
-            <Select onValueChange={setBranchId} value={branchId}>
+            <Select
+              onValueChange={(val: string | null) => val && setBranchId(val)}
+              value={branchId}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select branch..." />
               </SelectTrigger>

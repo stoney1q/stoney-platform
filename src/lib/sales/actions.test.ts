@@ -215,6 +215,12 @@ describe('Sales Foundation Actions', async () => {
     await prisma.sale.deleteMany({
       where: { branchId: { in: [mainBranchId, otherBranchId] } },
     });
+    await prisma.cashMovement.deleteMany({
+      where: { shift: { branchId: { in: [mainBranchId, otherBranchId] } } },
+    });
+    await prisma.shift.deleteMany({
+      where: { branchId: { in: [mainBranchId, otherBranchId] } },
+    });
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.user.deleteMany({
       where: { id: { in: [cashierUserId, otherUserId] } },
@@ -228,8 +234,17 @@ describe('Sales Foundation Actions', async () => {
     });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     currentMockCookie.value = 'active_cashier';
+    await prisma.shift.deleteMany({ where: { branchId: mainBranchId } });
+    await prisma.shift.create({
+      data: {
+        userId: cashierUserId,
+        branchId: mainBranchId,
+        status: 'OPEN',
+        openingBalance: 100.0,
+      },
+    });
   });
 
   it('creates a sale securely', async () => {

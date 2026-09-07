@@ -82,6 +82,7 @@ describe('Repairs Actions', () => {
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.branchStock.deleteMany({ where: { branchId } });
     await prisma.product.deleteMany({ where: { id: productId } });
+    await prisma.shift.deleteMany({ where: { branchId } });
     await prisma.user.deleteMany({ where: { branchId } });
     if (roleId) await prisma.role.deleteMany({ where: { id: roleId } });
     if (branchId) await prisma.branch.deleteMany({ where: { id: branchId } });
@@ -130,6 +131,16 @@ describe('Repairs Actions', () => {
       roleId: user.roleId,
       permissions: [], // Permissions are mocked via requirePermission
     };
+
+    await prisma.shift.deleteMany({ where: { branchId } });
+    await prisma.shift.create({
+      data: {
+        userId: user.id,
+        branchId: user.branchId,
+        status: 'OPEN',
+        openingBalance: 100.0,
+      },
+    });
 
     const customer = await prisma.customer.create({
       data: {
