@@ -8,6 +8,7 @@ import {
   completeAudit,
   updateAuditStatus,
 } from '@/lib/inventory/audit-actions';
+import { SafeStockAuditItemDTO } from '@/lib/inventory/dtos';
 import {
   Table,
   TableBody,
@@ -17,7 +18,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-export function ReviewAuditInterface({ audit }: { audit: any }) {
+export function ReviewAuditInterface({
+  audit,
+}: {
+  audit: import('@/lib/inventory/dtos').SafeStockAuditDTO;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -32,8 +37,8 @@ export function ReviewAuditInterface({ audit }: { audit: any }) {
     try {
       await completeAudit(audit.id);
       router.refresh();
-    } catch (e: any) {
-      alert(e.message || 'Failed to complete audit');
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Failed to complete audit');
       setLoading(false);
     }
   };
@@ -49,8 +54,8 @@ export function ReviewAuditInterface({ audit }: { audit: any }) {
     try {
       await updateAuditStatus(audit.id, 'CANCELLED');
       router.push('/inventory/audits');
-    } catch (e: any) {
-      alert(e.message || 'Failed to cancel audit');
+    } catch (e: unknown) {
+      alert((e as Error).message || 'Failed to cancel audit');
       setLoading(false);
     }
   };
@@ -96,7 +101,7 @@ export function ReviewAuditInterface({ audit }: { audit: any }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {audit.items.map((item: any) => {
+                {audit.items.map((item: SafeStockAuditItemDTO) => {
                   const expectedVariance =
                     item.countedQuantity - item.systemQuantity;
 

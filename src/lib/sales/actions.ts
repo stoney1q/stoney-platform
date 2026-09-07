@@ -386,6 +386,41 @@ export async function applyPayment(formData: FormData) {
       });
     }
 
+    let shiftId: string | undefined = undefined;
+    if (data.method === PaymentMethod.CASH) {
+      const activeShift = await tx.shift.findFirst({
+        where: {
+          userId: session.id,
+          status: 'OPEN',
+        },
+      });
+
+      if (!activeShift) {
+        throw new Error(
+          'An active open shift is required to accept CASH payments.'
+        );
+      }
+
+      // Lock the shift row to prevent TOCTOU races with closeShift
+      await tx.$executeRaw`SELECT 1 FROM "Shift" WHERE id = ${activeShift.id} FOR UPDATE`;
+
+      // Re-fetch to ensure it wasn't closed while waiting for the lock
+      const lockedShift = await tx.shift.findUniqueOrThrow({
+        where: { id: activeShift.id },
+      });
+
+      if (lockedShift.status !== 'OPEN') {
+        throw new Error(
+          'An active open shift is required to accept CASH payments.'
+        );
+      }
+
+      if (lockedShift.branchId !== sale.branchId) {
+        throw new Error('Active shift belongs to a different branch');
+      }
+      shiftId = lockedShift.id;
+    }
+
     // Always record the payment if we got this far
     await tx.payment.create({
       data: {
@@ -393,6 +428,7 @@ export async function applyPayment(formData: FormData) {
         amount: paymentAmount,
         method: data.method,
         reference: data.reference,
+        shiftId,
         createdById: session.id,
       },
     });
@@ -552,12 +588,48 @@ export async function returnSaleItem(formData: FormData) {
 
     // 8. Record Financial Refund (Negative Payment)
     if (refundAmount.greaterThan(0)) {
+      let shiftId: string | undefined = undefined;
+      if (data.refundMethod === PaymentMethod.CASH) {
+        const activeShift = await tx.shift.findFirst({
+          where: {
+            userId: session.id,
+            status: 'OPEN',
+          },
+        });
+
+        if (!activeShift) {
+          throw new Error(
+            'An active open shift is required to process CASH refunds.'
+          );
+        }
+
+        // Lock the shift row to prevent TOCTOU races with closeShift
+        await tx.$executeRaw`SELECT 1 FROM "Shift" WHERE id = ${activeShift.id} FOR UPDATE`;
+
+        // Re-fetch to ensure it wasn't closed while waiting for the lock
+        const lockedShift = await tx.shift.findUniqueOrThrow({
+          where: { id: activeShift.id },
+        });
+
+        if (lockedShift.status !== 'OPEN') {
+          throw new Error(
+            'An active open shift is required to process CASH refunds.'
+          );
+        }
+
+        if (lockedShift.branchId !== sale.branchId) {
+          throw new Error('Active shift belongs to a different branch');
+        }
+        shiftId = lockedShift.id;
+      }
+
       await tx.payment.create({
         data: {
           saleId: sale.id,
           amount: refundAmount.negated(),
           method: data.refundMethod,
           reference: 'Refund',
+          shiftId,
           createdById: session.id,
         },
       });

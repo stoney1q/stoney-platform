@@ -23,8 +23,8 @@ export function ActiveAuditInterface({
   audit,
   catalog,
 }: {
-  audit: any;
-  catalog: any[];
+  audit: import('@/lib/inventory/dtos').SafeStockAuditDTO;
+  catalog: { id: string; name: string; sku: string }[];
 }) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +47,8 @@ export function ActiveAuditInterface({
       await upsertAuditItem(audit.id, productId, quantity, 'increment');
       setSearchTerm('');
       router.refresh();
-    } catch (e) {
+    } catch (err) {
+      console.error(err);
       alert('Failed to update count');
     }
     setLoading(false);
@@ -58,10 +59,11 @@ export function ActiveAuditInterface({
     try {
       await updateAuditStatus(audit.id, 'REVIEW');
       router.push(`/inventory/audits/${audit.id}/review`);
-    } catch (e) {
-      alert('Failed to finish counting');
-      setFinishing(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to finish audit');
     }
+    setFinishing(false);
   };
 
   return (
@@ -75,7 +77,9 @@ export function ActiveAuditInterface({
                 placeholder="Scan or search SKU / Product Name..."
                 className="pl-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(ev: React.ChangeEvent<HTMLInputElement>) => {
+                  setSearchTerm(ev.target.value);
+                }}
               />
             </div>
             <Button

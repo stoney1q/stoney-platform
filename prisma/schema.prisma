@@ -34,6 +34,7 @@ model Branch {
   media          MediaAsset[]
   purchaseOrders PurchaseOrder[]
   stockAudits    StockAudit[]
+  shifts         Shift[]
 }
 
 model Role {
@@ -105,6 +106,8 @@ model User {
   purchaseOrdersCreated PurchaseOrder[]
   stockAuditsCreated    StockAudit[]    @relation("StockAuditCreator")
   stockAuditsCompleted  StockAudit[]    @relation("StockAuditCompleter")
+  shifts                Shift[]
+  cashMovements         CashMovement[]
 
   @@index([email])
   @@index([firebaseUid])
@@ -432,10 +435,13 @@ model Payment {
   method    PaymentMethod
   reference String?
 
+  shiftId String?
+
   createdById String
 
-  sale      Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id])
+  sale      Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id])
+  shift     Shift? @relation(fields: [shiftId], references: [id])
 
   createdAt DateTime @default(now())
 }
@@ -730,4 +736,60 @@ model StockAuditItem {
   product    Product    @relation(fields: [productId], references: [id])
 
   @@unique([stockAuditId, productId])
+}
+
+// ==========================================
+// SHIFT & CASH MANAGEMENT DOMAIN
+// ==========================================
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashMovementType {
+  CASH_IN
+  CASH_OUT
+}
+
+model Shift {
+  id       String      @id @default(cuid())
+  sequence Int         @unique @default(autoincrement())
+  status   ShiftStatus @default(OPEN)
+
+  branchId String
+  userId   String
+
+  openingBalance  Decimal  @db.Decimal(10, 2)
+  closingBalance  Decimal? @db.Decimal(10, 2)
+  expectedBalance Decimal? @db.Decimal(10, 2)
+  discrepancy     Decimal? @db.Decimal(10, 2)
+  notes           String?
+
+  branch Branch @relation(fields: [branchId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  payments      Payment[]
+  cashMovements CashMovement[]
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  @@index([branchId, status])
+  @@index([userId, status])
+}
+
+model CashMovement {
+  id      String           @id @default(cuid())
+  shiftId String
+  type    CashMovementType
+  amount  Decimal          @db.Decimal(10, 2)
+  reason  String
+
+  createdById String
+
+  shift     Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
 }

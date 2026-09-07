@@ -148,25 +148,40 @@ describe('Mobile API - Sales Returns', async () => {
     await prisma.sale.deleteMany({
       where: { branchId: mainBranchId },
     });
-    try {
-      await prisma.customer.deleteMany({ where: { id: customerId } });
-    } catch (e) {
-      // Ignore restrict failure
-    }
+    await prisma.customer.deleteMany({ where: { id: customerId } });
+    await prisma.cashMovement.deleteMany({
+      where: { shift: { userId: cashierUserId } },
+    });
+    await prisma.shift.deleteMany({ where: { userId: cashierUserId } });
     await prisma.user.deleteMany({
       where: { id: cashierUserId },
     });
-    await prisma.role.deleteMany({ where: { name: 'Test Cashier API' } });
-    await prisma.product.deleteMany({
-      where: { id: product1Id },
-    });
-    await prisma.branch.deleteMany({
-      where: { id: mainBranchId },
-    });
+    try {
+      await prisma.role.deleteMany({ where: { name: 'Test Cashier API' } });
+    } catch (e) {}
+    try {
+      await prisma.product.deleteMany({
+        where: { id: product1Id },
+      });
+    } catch (e) {}
+    try {
+      await prisma.branch.deleteMany({
+        where: { id: mainBranchId },
+      });
+    } catch (e) {}
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     currentMockCookie.value = 'active_cashier';
+    await prisma.shift.deleteMany({ where: { branchId: mainBranchId } });
+    await prisma.shift.create({
+      data: {
+        userId: cashierUserId,
+        branchId: mainBranchId,
+        status: 'OPEN',
+        openingBalance: 100.0,
+      },
+    });
   });
 
   it('POST /api/v1/sales/return succeeds', async () => {
@@ -209,7 +224,7 @@ describe('Mobile API - Sales Returns', async () => {
         saleItemId: item.id,
         quantity: 1,
         refundAmount: 100,
-        refundMethod: 'CASH',
+        refundMethod: 'CARD',
       }),
     });
 
