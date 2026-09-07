@@ -4,14 +4,21 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createProduct } from '@/lib/inventory/actions';
-import { ProductType, Category, Brand } from '@/generated/prisma/client';
+import {
+  ProductType,
+  Category,
+  Brand,
+  TaxRate,
+} from '@/generated/prisma/client';
 
 export function ProductFormDialog({
   categories = [],
   brands = [],
+  taxRates = [],
 }: {
   categories?: Category[];
   brands?: Brand[];
+  taxRates?: TaxRate[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -31,6 +38,7 @@ export function ProductFormDialog({
         sellingPrice: Number(formData.get('sellingPrice')),
         categoryId: formData.get('categoryId') as string | null,
         brandId: formData.get('brandId') as string | null,
+        taxRateId: formData.get('taxRateId') as string | null,
       };
 
       await createProduct(data);
@@ -135,6 +143,24 @@ export function ProductFormDialog({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tax Rate</label>
+                <select
+                  name="taxRateId"
+                  defaultValue={taxRates.find((t) => t.isDefault)?.id || ''}
+                  className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm"
+                >
+                  <option value="">-- No Tax --</option>
+                  {taxRates
+                    .filter((t) => t.isActive)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({(Number(t.rate) * 100).toFixed(2)}%)
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

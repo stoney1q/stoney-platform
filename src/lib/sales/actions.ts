@@ -27,6 +27,9 @@ import {
   calculateDocumentSubtotal,
   calculateLineTotal,
   calculateLineSubtotal,
+  calculateLineTax,
+  calculateDocumentTax,
+  calculateDocumentTotal,
 } from '@/lib/pricing/math';
 
 export async function searchSales(options: {
@@ -118,17 +121,23 @@ export async function getSale(id: string) {
 }
 
 function calculateSaleTotals(
-  items: { total: Prisma.Decimal }[],
+  items: { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal }[],
   saleDiscount: Prisma.Decimal
 ) {
   const subtotal = new Prisma.Decimal(
     calculateDocumentSubtotal(items).toString()
   );
+  const taxAmount = new Prisma.Decimal(calculateDocumentTax(items).toString());
   const total = new Prisma.Decimal(
-    calculateLineTotal(subtotal, saleDiscount).toString()
+    calculateDocumentTotal(
+      subtotal.toString(),
+      saleDiscount.toString(),
+      taxAmount.toString()
+    ).toString()
   );
   return {
     subtotal,
+    taxAmount,
     total,
   };
 }
@@ -156,6 +165,7 @@ export async function createSale(formData: FormData) {
       status: SaleStatus.PENDING,
       discount: new Prisma.Decimal(0),
       subtotal: new Prisma.Decimal(0),
+      taxAmount: new Prisma.Decimal(0),
       total: new Prisma.Decimal(0),
     },
   });
@@ -193,22 +203,34 @@ export async function addSaleItem(formData: FormData) {
 
     await requireBranchAccess(sale.branchId);
 
-    // 2. Fetch authoritative product price
+    // 2. Fetch authoritative product price and tax rate
     const product = await tx.product.findUniqueOrThrow({
       where: { id: data.productId },
+      include: { taxRate: true },
     });
 
     // 3. Exact decimal calculations
     const unitPrice = product.sellingPrice;
     const itemDiscount = new Prisma.Decimal(data.discount);
+    const taxRate = product.taxRate?.rate || 0;
 
     const lineSubtotal = new Prisma.Decimal(
       calculateLineSubtotal(unitPrice.toString(), data.quantity).toString()
     );
+
+    const taxableAmount = lineSubtotal.sub(itemDiscount);
+    const taxableBase = taxableAmount.isNegative()
+      ? new Prisma.Decimal(0)
+      : taxableAmount;
+
+    const lineTax = new Prisma.Decimal(
+      calculateLineTax(taxableBase.toString(), taxRate.toString()).toString()
+    );
     const lineTotal = new Prisma.Decimal(
       calculateLineTotal(
         lineSubtotal.toString(),
-        itemDiscount.toString()
+        itemDiscount.toString(),
+        lineTax.toString()
       ).toString()
     );
 
@@ -224,6 +246,7 @@ export async function addSaleItem(formData: FormData) {
         unitPrice: unitPrice,
         discount: itemDiscount,
         subtotal: lineSubtotal,
+        taxAmount: lineTax,
         total: lineTotal,
       },
     });
@@ -232,15 +255,17 @@ export async function addSaleItem(formData: FormData) {
     const updatedItems = await tx.saleItem.findMany({
       where: { saleId: sale.id },
     });
-    const { subtotal: saleSubtotal, total: saleTotal } = calculateSaleTotals(
-      updatedItems,
-      sale.discount
-    );
+    const {
+      subtotal: saleSubtotal,
+      taxAmount: saleTaxAmount,
+      total: saleTotal,
+    } = calculateSaleTotals(updatedItems, sale.discount);
 
     await tx.sale.update({
       where: { id: sale.id },
       data: {
         subtotal: saleSubtotal,
+        taxAmount: saleTaxAmount,
         total: saleTotal,
       },
     });
@@ -284,15 +309,17 @@ export async function removeSaleItem(formData: FormData) {
     const updatedItems = await tx.saleItem.findMany({
       where: { saleId: sale.id },
     });
-    const { subtotal: saleSubtotal, total: saleTotal } = calculateSaleTotals(
-      updatedItems,
-      sale.discount
-    );
+    const {
+      subtotal: saleSubtotal,
+      taxAmount: saleTaxAmount,
+      total: saleTotal,
+    } = calculateSaleTotals(updatedItems, sale.discount);
 
     await tx.sale.update({
       where: { id: sale.id },
       data: {
         subtotal: saleSubtotal,
+        taxAmount: saleTaxAmount,
         total: saleTotal,
       },
     });

@@ -163,6 +163,9 @@ model Product {
   transfers    Transfer[]
   repairParts  RepairPart[]
 
+  taxRateId String?
+  taxRate   TaxRate? @relation(fields: [taxRateId], references: [id], onDelete: SetNull)
+
   category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: Restrict)
 
@@ -379,9 +382,10 @@ model Sale {
   customerId  String
   createdById String
 
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  subtotal Decimal @default(0) @db.Decimal(10, 2)
-  total    Decimal @default(0) @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount Decimal @default(0) @db.Decimal(10, 2)
+  total     Decimal @default(0) @db.Decimal(10, 2)
 
   quotationId String? @unique
   repairId    String?
@@ -418,6 +422,7 @@ model SaleItem {
   unitPrice Decimal @db.Decimal(10, 2)
   discount  Decimal @default(0) @db.Decimal(10, 2)
   subtotal  Decimal @db.Decimal(10, 2)
+  taxAmount Decimal @default(0) @db.Decimal(10, 2)
   total     Decimal @db.Decimal(10, 2)
 
   returnedQuantity Int @default(0)
@@ -468,9 +473,10 @@ model Quotation {
   customerId  String
   createdById String
 
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  subtotal Decimal @default(0) @db.Decimal(10, 2)
-  total    Decimal @default(0) @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount Decimal @default(0) @db.Decimal(10, 2)
+  total     Decimal @default(0) @db.Decimal(10, 2)
 
   items QuotationItem[]
 
@@ -506,6 +512,7 @@ model QuotationItem {
   unitPrice Decimal @db.Decimal(10, 2)
   discount  Decimal @default(0) @db.Decimal(10, 2)
   subtotal  Decimal @db.Decimal(10, 2)
+  taxAmount Decimal @default(0) @db.Decimal(10, 2)
   total     Decimal @db.Decimal(10, 2)
 
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
@@ -792,4 +799,31 @@ model CashMovement {
   createdBy User  @relation(fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+// ==========================================
+// SETTINGS & TAX DOMAIN
+// ==========================================
+
+model StoreSettings {
+  id               String   @id @default("global")
+  currencyCode     String   @default("USD")
+  currencySymbol   String   @default("$")
+  taxRegistration  String?
+  receiptFooter    String?
+
+  updatedAt        DateTime @updatedAt
+}
+
+model TaxRate {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  rate         Decimal   @db.Decimal(5, 4)
+  isActive     Boolean   @default(true)
+  isDefault    Boolean   @default(false)
+
+  products     Product[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

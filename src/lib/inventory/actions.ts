@@ -23,10 +23,11 @@ export async function createProduct(data: {
   sku: string;
   name: string;
   description?: string;
-  sellingPrice?: number;
   type?: ProductType;
+  sellingPrice: number;
   categoryId?: string | null;
   brandId?: string | null;
+  taxRateId?: string | null;
 }) {
   await requirePermission('inventory:write');
 
@@ -43,6 +44,7 @@ export async function createProduct(data: {
       // Prisma expects undefined for omitted optional fields, but if someone passes empty string, convert to null
       categoryId: data.categoryId || null,
       brandId: data.brandId || null,
+      taxRateId: data.taxRateId || null,
     },
   });
 }
@@ -54,6 +56,7 @@ export async function updateProduct(
     description?: string;
     categoryId?: string | null;
     brandId?: string | null;
+    taxRateId?: string | null;
   }
 ) {
   await requirePermission('inventory:write');
@@ -64,6 +67,7 @@ export async function updateProduct(
       ...data,
       categoryId: data.categoryId === '' ? null : data.categoryId,
       brandId: data.brandId === '' ? null : data.brandId,
+      taxRateId: data.taxRateId === '' ? null : data.taxRateId,
     },
   });
 }

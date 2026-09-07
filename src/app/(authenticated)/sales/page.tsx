@@ -1,5 +1,6 @@
 import { requirePermission } from '@/lib/auth/guard';
 import { searchSales } from '@/lib/sales/actions';
+import { getPublicStoreSettings } from '@/lib/settings/actions';
 import {
   Table,
   TableBody,
@@ -26,6 +27,7 @@ export default async function SalesPage({
     : undefined;
 
   const result = await searchSales({ query, page, status });
+  const settings = await getPublicStoreSettings();
 
   return (
     <div className="space-y-6">
@@ -119,7 +121,8 @@ export default async function SalesPage({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    ${sale.total.toString()}
+                    {settings.currencySymbol}
+                    {sale.total.toString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Link href={`/sales/${sale.id}`}>

@@ -13,8 +13,8 @@ import {
   addCashMovement,
   getActiveShift,
 } from '@/lib/shifts/actions';
-import { SafeShiftDTO } from '@/lib/shifts/dtos';
-import { CashMovementType } from '@/generated/prisma/client';
+import type { SafeShiftDTO } from '@/lib/shifts/dtos';
+import type { CashMovementType } from '@/generated/prisma/client';
 
 export default function ShiftsPage() {
   const [activeShift, setActiveShift] = useState<SafeShiftDTO | null>(null);
@@ -25,9 +25,7 @@ export default function ShiftsPage() {
   const [closingBalance, setClosingBalance] = useState('');
   const [movementAmount, setMovementAmount] = useState('');
   const [movementReason, setMovementReason] = useState('');
-  const [movementType, setMovementType] = useState<CashMovementType>(
-    CashMovementType.CASH_IN
-  );
+  const [movementType, setMovementType] = useState<CashMovementType>('CASH_IN');
 
   const fetchShift = async () => {
     try {
@@ -173,22 +171,14 @@ export default function ShiftsPage() {
             <CardContent className="space-y-4">
               <div className="flex gap-4">
                 <Button
-                  variant={
-                    movementType === CashMovementType.CASH_IN
-                      ? 'default'
-                      : 'outline'
-                  }
-                  onClick={() => setMovementType(CashMovementType.CASH_IN)}
+                  variant={movementType === 'CASH_IN' ? 'default' : 'outline'}
+                  onClick={() => setMovementType('CASH_IN')}
                 >
                   Cash In
                 </Button>
                 <Button
-                  variant={
-                    movementType === CashMovementType.CASH_OUT
-                      ? 'default'
-                      : 'outline'
-                  }
-                  onClick={() => setMovementType(CashMovementType.CASH_OUT)}
+                  variant={movementType === 'CASH_OUT' ? 'default' : 'outline'}
+                  onClick={() => setMovementType('CASH_OUT')}
                 >
                   Cash Out
                 </Button>
@@ -212,10 +202,7 @@ export default function ShiftsPage() {
                 />
               </div>
               <Button onClick={handleCashMovement} className="w-full">
-                Record{' '}
-                {movementType === CashMovementType.CASH_IN
-                  ? 'Cash In'
-                  : 'Cash Out'}
+                Record {movementType === 'CASH_IN' ? 'Cash In' : 'Cash Out'}
               </Button>
             </CardContent>
           </Card>

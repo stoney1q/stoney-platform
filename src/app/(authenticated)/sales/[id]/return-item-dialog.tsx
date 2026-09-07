@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { returnSaleItem } from '@/lib/sales/actions';
 import { SaleItem, Sale } from '@/generated/prisma/client';
+import { useStoreSettings } from '@/lib/settings/context';
 
 export function ReturnItemDialog({
   sale,
@@ -21,6 +22,7 @@ export function ReturnItemDialog({
   item: SaleItem;
 }) {
   const router = useRouter();
+  const { currencySymbol } = useStoreSettings();
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +93,9 @@ export function ReturnItemDialog({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Refund Amount ($)</label>
+            <label className="text-sm font-medium">
+              Refund Amount ({currencySymbol})
+            </label>
             <input
               type="number"
               name="refundAmount"

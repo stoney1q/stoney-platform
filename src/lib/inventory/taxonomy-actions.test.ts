@@ -151,7 +151,7 @@ describe('Taxonomy Actions', async () => {
   afterAll(async () => {
     // Cleanup products first due to foreign keys
     await prisma.product.deleteMany({
-      where: { sku: { startsWith: 'TAX-TEST-' } },
+      where: { sellingPrice: 10, sku: { startsWith: 'TAX-TEST-' } },
     });
     await prisma.category.deleteMany({
       where: { name: { startsWith: 'TestCategory-' } },
@@ -208,6 +208,7 @@ describe('Taxonomy Actions', async () => {
     it('prevents deletion if assigned to a product', async () => {
       currentMockCookie.value = 'active_admin';
       const prod = await createProduct({
+        sellingPrice: 10,
         sku: 'TAX-TEST-CAT-PROD',
         name: 'Product with category',
         categoryId: catId,
@@ -270,6 +271,7 @@ describe('Taxonomy Actions', async () => {
     it('prevents deletion if assigned to a product', async () => {
       currentMockCookie.value = 'active_admin';
       const prod = await createProduct({
+        sellingPrice: 10,
         sku: 'TAX-TEST-BRAND-PROD',
         name: 'Product with brand',
         brandId: brandId,

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ProductFormDialog } from './product-form';
 import { ProductMediaDialog } from './product-media-dialog';
 import { getCategories, getBrands } from '@/lib/inventory/taxonomy-actions';
+import { getTaxRates } from '@/lib/settings/actions';
 import Link from 'next/link';
 
 export default async function ProductsPage({
@@ -23,7 +24,7 @@ export default async function ProductsPage({
 
   const { categoryId, brandId } = await searchParams;
 
-  const [products, categories, brands] = await Promise.all([
+  const [products, categories, brands, taxRates] = await Promise.all([
     prisma.product.findMany({
       where: {
         ...(categoryId ? { categoryId } : {}),
@@ -37,6 +38,7 @@ export default async function ProductsPage({
     }),
     getCategories(),
     getBrands(),
+    getTaxRates(),
   ]);
 
   return (
@@ -48,7 +50,11 @@ export default async function ProductsPage({
             Manage the product catalog and SKUs.
           </p>
         </div>
-        <ProductFormDialog categories={categories} brands={brands} />
+        <ProductFormDialog
+          categories={categories}
+          brands={brands}
+          taxRates={taxRates}
+        />
       </div>
 
       <div className="flex gap-4">
@@ -140,7 +146,10 @@ export default async function ProductsPage({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <ProductMediaDialog productId={product.id} productName={product.name} />
+                      <ProductMediaDialog
+                        productId={product.id}
+                        productName={product.name}
+                      />
                       <Button variant="ghost" size="sm">
                         Edit
                       </Button>

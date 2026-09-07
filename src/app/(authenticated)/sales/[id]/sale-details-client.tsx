@@ -28,6 +28,7 @@ import {
   Brand,
 } from '@/generated/prisma/client';
 import { ReturnItemDialog } from './return-item-dialog';
+import { useStoreSettings } from '@/lib/settings/context';
 
 type SaleWithRelations = Sale & {
   customer: Customer;
@@ -55,6 +56,7 @@ export function SaleDetailsClient({
   brandId?: string;
 }) {
   const router = useRouter();
+  const { currencySymbol } = useStoreSettings();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -160,17 +162,26 @@ export function SaleDetailsClient({
           </div>
         </div>
         <div className="bg-card rounded-lg border p-4">
+          <div className="text-muted-foreground text-sm font-medium">Tax</div>
+          <div className="mt-1 text-lg font-semibold">
+            {currencySymbol}
+            {Number(sale.taxAmount || 0).toFixed(2)}
+          </div>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
           <div className="text-muted-foreground text-sm font-medium">Total</div>
           <div className="mt-1 text-lg font-semibold">
-            ${Number(sale.total).toFixed(2)}
+            {currencySymbol}
+            {Number(sale.total).toFixed(2)}
           </div>
         </div>
         <div className="bg-card rounded-lg border p-4">
           <div className="text-muted-foreground text-sm font-medium">
             Amount Paid
           </div>
-          <div className="mt-1 text-lg font-semibold">
-            ${amountPaid.toFixed(2)}
+          <div className="mt-1 text-lg font-semibold text-green-600">
+            {currencySymbol}
+            {amountPaid.toFixed(2)}
           </div>
         </div>
       </div>
@@ -247,9 +258,9 @@ export function SaleDetailsClient({
                   {availableProducts.map((p) => {
                     const stock = p.branchStocks[0]?.onHand || 0;
                     return (
-                      <option key={p.id} value={p.id} disabled={stock <= 0}>
-                        {p.name} - ${Number(p.sellingPrice).toFixed(2)} ({stock}{' '}
-                        in stock)
+                      <option key={p.id} value={p.id}>
+                        {p.name} - {currencySymbol}
+                        {Number(p.sellingPrice).toFixed(2)} ({stock} available)
                       </option>
                     );
                   })}
@@ -266,8 +277,10 @@ export function SaleDetailsClient({
                   className="border-input focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
                 />
               </div>
-              <div className="w-24 space-y-2">
-                <label className="text-xs font-medium">Discount ($)</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  Discount ({currencySymbol})
+                </label>
                 <input
                   type="number"
                   name="discount"
@@ -293,6 +306,7 @@ export function SaleDetailsClient({
                 <TableHead className="text-right">Unit Price</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Discount</TableHead>
+                <TableHead className="text-right">Tax</TableHead>
                 <TableHead className="text-right">Line Total</TableHead>
                 {sale.status === 'PENDING' && <TableHead></TableHead>}
               </TableRow>
@@ -301,7 +315,7 @@ export function SaleDetailsClient({
               {sale.items.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={sale.status === 'PENDING' ? 7 : 6}
+                    colSpan={sale.status === 'PENDING' ? 8 : 7}
                     className="text-muted-foreground text-center"
                   >
                     No items added yet.
@@ -315,16 +329,23 @@ export function SaleDetailsClient({
                       {item.productName}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${Number(item.unitPrice).toFixed(2)}
+                      {currencySymbol}
+                      {Number(item.unitPrice).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       {item.quantity}
                     </TableCell>
-                    <TableCell className="text-right">
-                      ${Number(item.discount).toFixed(2)}
+                    <TableCell className="text-right text-red-500">
+                      {currencySymbol}
+                      {Number(item.discount).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ${Number(item.total).toFixed(2)}
+                      {currencySymbol}
+                      {Number((item as any).taxAmount || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {currencySymbol}
+                      {Number(item.total).toFixed(2)}
                     </TableCell>
                     {sale.status === 'PENDING' && (
                       <TableCell className="text-right">
@@ -385,8 +406,10 @@ export function SaleDetailsClient({
                     ))}
                   </select>
                 </div>
-                <div className="w-32 space-y-2">
-                  <label className="text-xs font-medium">Amount ($)</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">
+                    Amount ({currencySymbol})
+                  </label>
                   <input
                     type="number"
                     name="amount"
@@ -435,7 +458,8 @@ export function SaleDetailsClient({
                     <TableCell>{p.method}</TableCell>
                     <TableCell>{p.reference}</TableCell>
                     <TableCell className="text-right">
-                      ${Number(p.amount).toFixed(2)}
+                      {currencySymbol}
+                      {Number(p.amount).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))}

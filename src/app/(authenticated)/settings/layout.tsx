@@ -16,6 +16,18 @@ export default async function SettingsLayout({
       <div className="flex-none p-6 pb-0">
         <h1 className="mb-4 text-2xl font-semibold">Settings</h1>
         <div className="flex space-x-4 border-b">
+          <Link
+            href="/settings/general"
+            className="px-1 py-2 text-sm font-medium hover:text-blue-600 focus:outline-none"
+          >
+            General
+          </Link>
+          <Link
+            href="/settings/taxes"
+            className="px-1 py-2 text-sm font-medium hover:text-blue-600 focus:outline-none"
+          >
+            Taxes
+          </Link>
           {canManageBranches && (
             <Link
               href="/settings/branches"
