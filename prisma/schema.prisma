@@ -33,6 +33,7 @@ model Branch {
   quotations     Quotation[]
   media          MediaAsset[]
   purchaseOrders PurchaseOrder[]
+  stockAudits    StockAudit[]
 }
 
 model Role {
@@ -102,6 +103,8 @@ model User {
   quotations            Quotation[]
   uploadedMedia         MediaAsset[]    @relation("CreatedMedia")
   purchaseOrdersCreated PurchaseOrder[]
+  stockAuditsCreated    StockAudit[]    @relation("StockAuditCreator")
+  stockAuditsCompleted  StockAudit[]    @relation("StockAuditCompleter")
 
   @@index([email])
   @@index([firebaseUid])
@@ -165,6 +168,7 @@ model Product {
   quotationsItems    QuotationItem[]
   media              MediaAsset[]
   purchaseOrderItems PurchaseOrderItem[]
+  stockAuditItems    StockAuditItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -672,4 +676,58 @@ model MediaAsset {
   @@index([productId])
   @@index([repairId])
   @@index([branchId])
+}
+
+// ==========================================
+// AUDIT DOMAIN
+// ==========================================
+
+enum StockAuditStatus {
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+model StockAudit {
+  id       String           @id @default(cuid())
+  sequence Int              @unique @default(autoincrement())
+  status   StockAuditStatus @default(IN_PROGRESS)
+  name     String?
+
+  branchId      String
+  createdById   String
+  completedById String?
+
+  items StockAuditItem[]
+
+  branch      Branch @relation(fields: [branchId], references: [id])
+  createdBy   User   @relation("StockAuditCreator", fields: [createdById], references: [id])
+  completedBy User?  @relation("StockAuditCompleter", fields: [completedById], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([branchId, status, createdAt])
+}
+
+model StockAuditItem {
+  id           String @id @default(cuid())
+  stockAuditId String
+  productId    String
+
+  // Snapshot at creation (For UI reference only)
+  systemQuantity Int
+
+  // Cumulative physical count
+  countedQuantity Int
+
+  // Final calculated variance applied at completion
+  variance Int?
+
+  stockAudit StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@unique([stockAuditId, productId])
 }
