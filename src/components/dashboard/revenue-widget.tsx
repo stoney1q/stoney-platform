@@ -1,4 +1,5 @@
 import { getRevenueMetrics, RevenueMetricsDTO } from '@/lib/dashboard/queries';
+import { getPublicStoreSettings } from '@/lib/settings/actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, Clock } from 'lucide-react';
 import { AuthError } from '@/lib/auth/guard';
@@ -29,6 +30,8 @@ export async function RevenueWidget() {
     );
   }
 
+  const { currencySymbol } = await getPublicStoreSettings();
+
   return (
     <div className="col-span-full grid gap-4 md:grid-cols-3 lg:grid-cols-3">
       <Card>
@@ -37,7 +40,10 @@ export async function RevenueWidget() {
           <DollarSign className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${metrics.todayTotal}</div>
+          <div className="text-2xl font-bold">
+            {currencySymbol}
+            {metrics.todayTotal}
+          </div>
           <p className="text-muted-foreground text-xs">
             {metrics.completedSalesCount} completed sales
           </p>
@@ -52,7 +58,10 @@ export async function RevenueWidget() {
           <DollarSign className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${metrics.weekTotal}</div>
+          <div className="text-2xl font-bold">
+            {currencySymbol}
+            {metrics.weekTotal}
+          </div>
         </CardContent>
       </Card>
 
@@ -64,7 +73,10 @@ export async function RevenueWidget() {
           <Clock className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${metrics.pendingTotal}</div>
+          <div className="text-2xl font-bold">
+            {currencySymbol}
+            {metrics.pendingTotal}
+          </div>
           <p className="text-muted-foreground text-xs">Outstanding balances</p>
         </CardContent>
       </Card>

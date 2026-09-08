@@ -6,6 +6,8 @@ import { RevenueWidget } from '@/components/dashboard/revenue-widget';
 import { RepairQueueWidget } from '@/components/dashboard/repair-queue-widget';
 import { InventoryAlertsWidget } from '@/components/dashboard/inventory-alerts-widget';
 import { QuotationMetricsWidget } from '@/components/dashboard/quotation-metrics-widget';
+import { ShiftSummaryWidget } from '@/components/dashboard/shift-summary-widget';
+import { PaymentBreakdownWidget } from '@/components/dashboard/payment-breakdown-widget';
 
 function WidgetSkeleton() {
   return (
@@ -30,7 +32,7 @@ export default async function DashboardPage() {
         <h1 className="text-lg font-semibold md:text-2xl">Dashboard</h1>
       </div>
 
-      {/* User Context */}
+      {/* User Context — top row: Welcome, Branch, Shift Status */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -58,6 +60,13 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
+        <Suspense fallback={<WidgetSkeleton />}>
+          <ShiftSummaryWidget />
+        </Suspense>
+      </div>
+
+      {/* Access Role — secondary context row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Access Role</CardTitle>
@@ -82,12 +91,15 @@ export default async function DashboardPage() {
         </Suspense>
       </div>
 
-      <div className="mt-2 grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+      <div className="mt-2 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Suspense fallback={<WidgetSkeleton />}>
           <InventoryAlertsWidget />
         </Suspense>
         <Suspense fallback={<WidgetSkeleton />}>
           <QuotationMetricsWidget />
+        </Suspense>
+        <Suspense fallback={<WidgetSkeleton />}>
+          <PaymentBreakdownWidget />
         </Suspense>
       </div>
     </div>

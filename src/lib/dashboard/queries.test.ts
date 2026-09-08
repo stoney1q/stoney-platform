@@ -13,6 +13,8 @@ import {
   PaymentMethod,
   QuotationStatus,
   RepairStatus,
+  ShiftStatus,
+  CashMovementType,
 } from '@/generated/prisma/client';
 
 const { currentMockUser } = vi.hoisted(() => ({
@@ -53,6 +55,8 @@ describe('Dashboard Queries', async () => {
     getRepairQueue,
     getLowStockAlerts,
     getQuotationMetrics,
+    getShiftSummary,
+    getPaymentBreakdown,
   } = await import('./queries');
   const { getTodayUTCBounds, getThisWeekUTCBounds } = await import('./utils');
 
@@ -61,7 +65,9 @@ describe('Dashboard Queries', async () => {
   let mainBranchId: string;
   let otherBranchId: string;
   let managerUserId: string;
+  let shiftUserId: string;
   let customerId: string;
+  let openShiftId: string;
 
   beforeAll(async () => {
     // 1. Branches
@@ -96,6 +102,7 @@ describe('Dashboard Queries', async () => {
       'dashboard:repairs:read',
       'dashboard:inventory:read',
       'dashboard:quotations:read',
+      'dashboard:shifts:read',
     ];
     for (const p of perms) {
       const perm = await prisma.permission.upsert({
@@ -148,6 +155,21 @@ describe('Dashboard Queries', async () => {
         isActive: true,
       },
     });
+
+    // Shift user (same branch as manager, has dashboard:shifts:read via managerRole)
+    const shiftUser = await prisma.user.create({
+      data: {
+        email: `shiftuser_${testId}@test.com`,
+        firstName: 'Shift',
+        lastName: 'U',
+        branchId: mainBranchId,
+        roleId: managerRole.id,
+        firebaseUid: `sft_${testId}`,
+        emailVerified: true,
+        isActive: true,
+      },
+    });
+    shiftUserId = shiftUser.id;
 
     // 4. Customer
     const customer = await prisma.customer.create({
@@ -315,10 +337,96 @@ describe('Dashboard Queries', async () => {
         total: 100,
       },
     });
+
+    // 9. Open Shift for shiftUser with cash payments and movements
+    const openShift = await prisma.shift.create({
+      data: {
+        branchId: mainBranchId,
+        userId: shiftUserId,
+        status: ShiftStatus.OPEN,
+        openingBalance: 50,
+      },
+    });
+    openShiftId = openShift.id;
+
+    // A CASH payment on this shift (sale is PENDING, but shift aggregation is independent of sale status)
+    const shiftSale = await prisma.sale.create({
+      data: {
+        branchId: mainBranchId,
+        customerId,
+        createdById: shiftUserId,
+        status: SaleStatus.COMPLETED,
+        total: 100,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        saleId: shiftSale.id,
+        amount: 75,
+        method: PaymentMethod.CASH,
+        shiftId: openShiftId,
+        createdById: shiftUserId,
+      },
+    });
+    // A CARD payment on the same sale (should NOT count towards shift cash)
+    await prisma.payment.create({
+      data: {
+        saleId: shiftSale.id,
+        amount: 25,
+        method: PaymentMethod.CARD,
+        createdById: shiftUserId,
+      },
+    });
+
+    // Cash movements: +20 CASH_IN, -10 CASH_OUT
+    await prisma.cashMovement.create({
+      data: {
+        shiftId: openShiftId,
+        type: CashMovementType.CASH_IN,
+        amount: 20,
+        reason: 'Petty cash top-up',
+        createdById: shiftUserId,
+      },
+    });
+    await prisma.cashMovement.create({
+      data: {
+        shiftId: openShiftId,
+        type: CashMovementType.CASH_OUT,
+        amount: 10,
+        reason: 'Safe drop',
+        createdById: shiftUserId,
+      },
+    });
+
+    // A COMPLETED sale with mixed payment methods for getPaymentBreakdown
+    // (shiftSale above already has a CASH 75 + CARD 25 payment on a COMPLETED sale)
+    // Add a TRANSFER payment on another completed sale
+    const transferSale = await prisma.sale.create({
+      data: {
+        branchId: mainBranchId,
+        customerId,
+        createdById: shiftUserId,
+        status: SaleStatus.COMPLETED,
+        total: 200,
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        saleId: transferSale.id,
+        amount: 200,
+        method: PaymentMethod.TRANSFER,
+        createdById: shiftUserId,
+      },
+    });
   });
 
   afterAll(async () => {
     // Delete in reverse dependency order
+    // Shift-related cleanup first
+    await prisma.cashMovement.deleteMany({ where: { shiftId: openShiftId } });
+    await prisma.payment.deleteMany({ where: { createdById: shiftUserId } });
+    await prisma.sale.deleteMany({ where: { createdById: shiftUserId } });
+    await prisma.shift.deleteMany({ where: { userId: shiftUserId } });
     await prisma.payment.deleteMany({ where: { createdById: managerUserId } });
     await prisma.sale.deleteMany({ where: { createdById: managerUserId } });
     await prisma.repair.deleteMany({
@@ -410,7 +518,8 @@ describe('Dashboard Queries', async () => {
       const revenue = await getRevenueMetrics();
       // Includes Sale D if within today's bounds. Since we did not use fake timers,
       // it was created just now, so it should be included.
-      expect(revenue.todayTotal).toBe('1250.50');
+      // Also includes shiftSale (100.00) and transferSale (200.00) added in the shift fixture.
+      expect(revenue.todayTotal).toBe('1550.50');
       expect(revenue.completedSalesCount).toBeGreaterThanOrEqual(1);
     });
   });
@@ -492,6 +601,114 @@ describe('Dashboard Queries', async () => {
 
       const repairs = await getRepairQueue();
       expect(repairs.length).toBe(0);
+    });
+  });
+
+  describe('Shift Summary', () => {
+    it('returns hasOpenShift: false when the user has no open shift', async () => {
+      // managerUser has no open shift — shiftUser does
+      const summary = await getShiftSummary();
+      expect(summary.hasOpenShift).toBe(false);
+      expect(summary.shiftId).toBeNull();
+      expect(summary.openedAt).toBeNull();
+      expect(summary.openingBalance).toBe('0.00');
+      expect(summary.expectedBalance).toBe('0.00');
+      expect(summary.movementsCount).toBe(0);
+    });
+
+    it('returns correct live balance for an open shift', async () => {
+      // Switch to shiftUser who has the open shift
+      currentMockUser.uid = `sft_${testId}`;
+      currentMockUser.email = `shiftuser_${testId}@test.com`;
+
+      const summary = await getShiftSummary();
+      expect(summary.hasOpenShift).toBe(true);
+      expect(summary.shiftId).toBe(openShiftId);
+      expect(summary.openingBalance).toBe('50.00');
+      // cashSales=75, cashIn=20, cashOut=10
+      // expectedBalance = 50 + 75 + 20 - 10 = 135.00
+      expect(summary.cashSalesTotal).toBe('75.00');
+      expect(summary.cashInTotal).toBe('20.00');
+      expect(summary.cashOutTotal).toBe('10.00');
+      expect(summary.expectedBalance).toBe('135.00');
+      expect(summary.movementsCount).toBe(2);
+    });
+
+    it('does not count non-CASH payments towards shift balance', async () => {
+      currentMockUser.uid = `sft_${testId}`;
+      currentMockUser.email = `shiftuser_${testId}@test.com`;
+
+      const summary = await getShiftSummary();
+      // CARD payment of 25 must not appear in cashSalesTotal
+      expect(summary.cashSalesTotal).toBe('75.00');
+    });
+
+    it('returns all fixed-point money strings', async () => {
+      currentMockUser.uid = `sft_${testId}`;
+      currentMockUser.email = `shiftuser_${testId}@test.com`;
+
+      const summary = await getShiftSummary();
+      const moneyFields = [
+        summary.openingBalance,
+        summary.expectedBalance,
+        summary.cashSalesTotal,
+        summary.cashInTotal,
+        summary.cashOutTotal,
+      ];
+      for (const field of moneyFields) {
+        expect(field).toMatch(/^\d+\.\d{2}$/);
+      }
+    });
+
+    it('rejects users without dashboard:shifts:read permission', async () => {
+      currentMockUser.value = 'active_cashier';
+      currentMockUser.uid = `csh_${testId}`;
+      currentMockUser.email = `cashier_${testId}@test.com`;
+
+      await expect(getShiftSummary()).rejects.toThrow('Access denied');
+    });
+  });
+
+  describe('Payment Breakdown', () => {
+    it('returns correct per-method totals for today', async () => {
+      // Completed sales created by shiftUser today:
+      //   shiftSale:    CASH 75, CARD 25
+      //   transferSale: TRANSFER 200
+      // Completed sales created by managerUser today:
+      //   Sale D: total 1250.50 (no payments attached in fixture)
+      const breakdown = await getPaymentBreakdown();
+      // Only payments attached to COMPLETED sales count
+      // shiftUser's sales are COMPLETED with explicit payment records
+      expect(breakdown.cash).toMatch(/^\d+\.\d{2}$/);
+      expect(breakdown.card).toMatch(/^\d+\.\d{2}$/);
+      expect(breakdown.transfer).toMatch(/^\d+\.\d{2}$/);
+      expect(breakdown.other).toMatch(/^\d+\.\d{2}$/);
+      expect(breakdown.total).toMatch(/^\d+\.\d{2}$/);
+    });
+
+    it('includes shiftUser CASH and CARD payments on completed sales', async () => {
+      const breakdown = await getPaymentBreakdown();
+      // CASH: at least 75.00 (from shiftSale)
+      expect(parseFloat(breakdown.cash)).toBeGreaterThanOrEqual(75);
+      // CARD: at least 25.00
+      expect(parseFloat(breakdown.card)).toBeGreaterThanOrEqual(25);
+      // TRANSFER: at least 200.00
+      expect(parseFloat(breakdown.transfer)).toBeGreaterThanOrEqual(200);
+      // Total must equal sum of all methods
+      const sum =
+        parseFloat(breakdown.cash) +
+        parseFloat(breakdown.card) +
+        parseFloat(breakdown.transfer) +
+        parseFloat(breakdown.other);
+      expect(parseFloat(breakdown.total)).toBeCloseTo(sum, 2);
+    });
+
+    it('rejects users without dashboard:revenue:read permission', async () => {
+      currentMockUser.value = 'active_cashier';
+      currentMockUser.uid = `csh_${testId}`;
+      currentMockUser.email = `cashier_${testId}@test.com`;
+
+      await expect(getPaymentBreakdown()).rejects.toThrow('Access denied');
     });
   });
 });
