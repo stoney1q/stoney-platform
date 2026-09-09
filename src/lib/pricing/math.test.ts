@@ -91,9 +91,31 @@ describe('Pricing Math Utilities', () => {
   });
 
   describe('calculateDocumentTotal', () => {
-    it('should calculate document total exactly', () => {
-      const result = calculateDocumentTotal(100, 10, 20);
-      assert.strictEqual(result.toString(), '110'); // 100 - 10 + 20
+    it('should exactly calculate document total using the sum of line totals, minus document discount', () => {
+      const items = [
+        // Subtotal = 100, Item Discount = 10, Tax = 5 -> Line Total = 95
+        { subtotal: 100, discount: 10, taxAmount: 5 },
+        // Subtotal = 50, Item Discount = 0, Tax = 2 -> Line Total = 52
+        { subtotal: 50, discount: 0, taxAmount: 2 },
+      ];
+      // Sum of line totals = 147
+      // Document discount = 20
+      // Final = 127
+      const result = calculateDocumentTotal(items, 20);
+      assert.strictEqual(result.toString(), '127');
+    });
+
+    it('should floor document total at 0', () => {
+      const items = [{ subtotal: 100, discount: 0, taxAmount: 0 }];
+      // Line Total = 100. Doc discount = 150. Floor at 0.
+      const result = calculateDocumentTotal(items, 150);
+      assert.strictEqual(result.toString(), '0');
+    });
+
+    it('should process correctly when there is no document discount', () => {
+      const items = [{ subtotal: 100, discount: 10, taxAmount: 5 }];
+      const result = calculateDocumentTotal(items);
+      assert.strictEqual(result.toString(), '95');
     });
   });
 

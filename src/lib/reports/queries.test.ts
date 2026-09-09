@@ -6,6 +6,9 @@ import {
   getRepairStatusReport,
   getQuotationStatusReport,
   getInventoryMovementReport,
+  getProductPerformanceReport,
+  getProfitabilityReport,
+  getShiftReconciliationReport,
 } from './queries';
 import { exportReportCSV } from './actions';
 import { resolveDateRangeUTCBounds, formatToBusinessDate } from './utils';
@@ -269,6 +272,65 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         expect(result[0]).not.toHaveProperty('value');
         expect(result[0]).not.toHaveProperty('cost');
       }
+    });
+
+    it('21. getProfitabilityReport formatting', async () => {
+      vi.mocked(requirePermission).mockResolvedValue({
+        id: 'manager1',
+        role: { name: 'Manager' },
+        permissions: ['reports:read'],
+        branchId: 'branch-1',
+      } as any);
+
+      vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+        {
+          dateStr: '2026-08-01',
+          revenue: { toFixed: () => '100.00', valueOf: () => 100 },
+          cogs: { toFixed: () => '60.00', valueOf: () => 60 },
+        },
+      ] as any);
+
+      const result = await getProfitabilityReport();
+      // Rev is mocked as 100, Cost is mocked as 60. Margin is (40/100)*100 = 40
+      expect(result).toEqual([
+        {
+          date: '2026-08-01',
+          revenue: '100.00',
+          cogs: '60.00',
+          grossProfit: '40.00',
+          marginPercentage: 40,
+        },
+      ]);
+    });
+
+    it('22. getProductPerformanceReport formatting and properties', async () => {
+      vi.mocked(requirePermission).mockResolvedValue({
+        id: 'manager1',
+        role: { name: 'Manager' },
+        permissions: ['reports:read'],
+        branchId: 'branch-1',
+      } as any);
+
+      vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+        {
+          productId: 'prod1',
+          sku: 'SKU1',
+          productName: 'Product 1',
+          quantitySold: BigInt(10),
+          revenue: { toFixed: () => '150.00', valueOf: () => 150 },
+        },
+      ] as any);
+
+      const result = await getProductPerformanceReport();
+      expect(result).toEqual([
+        {
+          productId: 'prod1',
+          sku: 'SKU1',
+          productName: 'Product 1',
+          quantitySold: 10,
+          revenue: '150.00',
+        },
+      ]);
     });
   });
 });

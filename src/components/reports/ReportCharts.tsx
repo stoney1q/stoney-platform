@@ -86,3 +86,31 @@ export function InventoryMovementChart({ data }: { data: any[] }) {
     </div>
   );
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function ProfitMarginChart({ data }: { data: any[] }) {
+  if (data.length === 0) return null;
+
+  return (
+    <div className="mt-4 h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={data}
+          margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+        >
+          <Line
+            type="monotone"
+            dataKey="marginPercentage"
+            stroke="#10b981"
+            name="Margin (%)"
+          />
+          <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

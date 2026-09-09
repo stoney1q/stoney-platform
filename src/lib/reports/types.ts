@@ -42,3 +42,28 @@ export interface InventoryMovementDTO {
   count: number;
   quantity: number;
 }
+
+export interface ProductPerformanceDTO {
+  productId: string;
+  sku: string;
+  productName: string;
+  quantitySold: number;
+  revenue: Money;
+}
+
+export interface ProfitabilityDTO {
+  date: string; // YYYY-MM-DD
+  revenue: Money;
+  cogs: Money;
+  grossProfit: Money;
+  marginPercentage: number;
+}
+
+export interface ShiftReconciliationDTO {
+  date: string; // YYYY-MM-DD
+  branchId: string;
+  branchName: string;
+  expectedBalance: Money;
+  actualBalance: Money;
+  discrepancy: Money;
+}

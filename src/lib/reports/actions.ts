@@ -7,6 +7,9 @@ import {
   getRepairStatusReport,
   getQuotationStatusReport,
   getInventoryMovementReport,
+  getProductPerformanceReport,
+  getProfitabilityReport,
+  getShiftReconciliationReport,
 } from './queries';
 import { ReportParams } from './types';
 
@@ -16,7 +19,10 @@ export async function exportReportCSV(
     | 'salesStatus'
     | 'repairStatus'
     | 'quotationStatus'
-    | 'inventoryMovement',
+    | 'inventoryMovement'
+    | 'productPerformance'
+    | 'profitability'
+    | 'shiftReconciliation',
   params?: ReportParams
 ): Promise<string> {
   await requirePermission('reports:export');
@@ -38,6 +44,15 @@ export async function exportReportCSV(
       break;
     case 'inventoryMovement':
       data = await getInventoryMovementReport(params);
+      break;
+    case 'productPerformance':
+      data = await getProductPerformanceReport(params);
+      break;
+    case 'profitability':
+      data = await getProfitabilityReport(params);
+      break;
+    case 'shiftReconciliation':
+      data = await getShiftReconciliationReport(params);
       break;
     default:
       throw new Error('Invalid report type');
