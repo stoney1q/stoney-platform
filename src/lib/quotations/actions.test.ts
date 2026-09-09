@@ -183,7 +183,7 @@ describe('Quotations Actions', () => {
       // Verify Sale
       expect(sale).toBeDefined();
       expect(sale.quotationId).toBe(quotation.id);
-      expect(sale.subtotal.toString()).toBe('190'); // sum(lineTotal)
+      expect(sale.subtotal.toString()).toBe('190'); // sum(lineSubtotal)
       expect(sale.total.toString()).toBe('190'); // saleSubtotal - saleDiscount
 
       // Verify Quotation is converted

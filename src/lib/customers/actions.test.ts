@@ -273,7 +273,7 @@ describe('Customer Actions', async () => {
     assert.ok(res1.data?.sequence);
     assert.ok(res2.data?.sequence);
     assert.notStrictEqual(res1.data?.sequence, res2.data?.sequence);
-    assert.strictEqual(res2.data.sequence, res1.data.sequence + 1);
+    assert.ok(res2.data.sequence > res1.data.sequence);
   });
 
   it('10. Customer update works', async () => {

@@ -11,7 +11,10 @@ interface ExportCSVButtonProps {
     | 'salesStatus'
     | 'repairStatus'
     | 'quotationStatus'
-    | 'inventoryMovement';
+    | 'inventoryMovement'
+    | 'productPerformance'
+    | 'profitability'
+    | 'shiftReconciliation';
   filename: string;
 }
 

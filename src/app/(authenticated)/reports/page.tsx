@@ -5,6 +5,9 @@ import {
   getRepairStatusReport,
   getQuotationStatusReport,
   getInventoryMovementReport,
+  getProductPerformanceReport,
+  getProfitabilityReport,
+  getShiftReconciliationReport,
 } from '@/lib/reports/queries';
 import { ReportFilters } from '@/components/reports/ReportFilters';
 import { ReportTable } from '@/components/reports/ReportTable';
@@ -12,6 +15,7 @@ import {
   SalesRevenueChart,
   StatusDistributionChart,
   InventoryMovementChart,
+  ProfitMarginChart,
 } from '@/components/reports/ReportCharts';
 import { ExportCSVButton } from '@/components/reports/ExportCSVButton';
 
@@ -43,12 +47,18 @@ export default async function ReportsPage({
     repairStatus,
     quotationStatus,
     inventoryMovement,
+    productPerformance,
+    profitability,
+    shiftReconciliation,
   ] = await Promise.all([
     getSalesRevenueReport(queryParams),
     getSalesStatusReport(queryParams),
     getRepairStatusReport(queryParams),
     getQuotationStatusReport(queryParams),
     getInventoryMovementReport(queryParams),
+    getProductPerformanceReport(queryParams),
+    getProfitabilityReport(queryParams),
+    getShiftReconciliationReport(queryParams),
   ]);
 
   return (
@@ -96,6 +106,30 @@ export default async function ReportsPage({
                     { header: 'Status', accessor: 'status' },
                     { header: 'Revenue', accessor: 'revenue' },
                     { header: 'Count', accessor: 'count' },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="relative rounded-md border p-4 shadow-sm md:col-span-2">
+              <div className="mb-2 flex items-start justify-between">
+                <h3 className="text-lg font-semibold">
+                  Profitability & Margin
+                </h3>
+                <ExportCSVButton
+                  reportType="profitability"
+                  filename="profitability.csv"
+                />
+              </div>
+              <ProfitMarginChart data={profitability} />
+              <div className="mt-4">
+                <ReportTable
+                  data={profitability}
+                  columns={[
+                    { header: 'Date', accessor: 'date' },
+                    { header: 'Revenue', accessor: 'revenue' },
+                    { header: 'COGS', accessor: 'cogs' },
+                    { header: 'Gross Profit', accessor: 'grossProfit' },
+                    { header: 'Margin %', accessor: 'marginPercentage' },
                   ]}
                 />
               </div>
@@ -171,6 +205,56 @@ export default async function ReportsPage({
                   { header: 'Movement Type', accessor: 'type' },
                   { header: 'Event Count', accessor: 'count' },
                   { header: 'Net Quantity', accessor: 'quantity' },
+                ]}
+              />
+            </div>
+          </div>
+        </section>
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold">Products</h2>
+          <div className="relative rounded-md border p-4 shadow-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <h3 className="text-lg font-semibold">Top Performing Products</h3>
+              <ExportCSVButton
+                reportType="productPerformance"
+                filename="product_performance.csv"
+              />
+            </div>
+            <div className="mt-4">
+              <ReportTable
+                data={productPerformance}
+                columns={[
+                  { header: 'SKU', accessor: 'sku' },
+                  { header: 'Product Name', accessor: 'productName' },
+                  { header: 'Quantity Sold', accessor: 'quantitySold' },
+                  { header: 'Revenue', accessor: 'revenue' },
+                ]}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-bold">Shifts & Cash Reconciliation</h2>
+          <div className="relative rounded-md border p-4 shadow-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <h3 className="text-lg font-semibold">
+                End of Day Discrepancies
+              </h3>
+              <ExportCSVButton
+                reportType="shiftReconciliation"
+                filename="shift_reconciliation.csv"
+              />
+            </div>
+            <div className="mt-4">
+              <ReportTable
+                data={shiftReconciliation}
+                columns={[
+                  { header: 'Date', accessor: 'date' },
+                  { header: 'Branch', accessor: 'branchName' },
+                  { header: 'Expected Balance', accessor: 'expectedBalance' },
+                  { header: 'Actual Balance', accessor: 'actualBalance' },
+                  { header: 'Discrepancy', accessor: 'discrepancy' },
                 ]}
               />
             </div>

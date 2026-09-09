@@ -111,7 +111,11 @@ export async function getQuotation(id: string) {
 }
 
 function calculateQuotationTotals(
-  items: { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal }[],
+  items: {
+    subtotal: Prisma.Decimal;
+    discount: Prisma.Decimal;
+    taxAmount: Prisma.Decimal;
+  }[],
   quotationDiscount: Prisma.Decimal
 ) {
   const subtotal = new Prisma.Decimal(
@@ -119,11 +123,7 @@ function calculateQuotationTotals(
   );
   const taxAmount = new Prisma.Decimal(calculateDocumentTax(items).toString());
   const total = new Prisma.Decimal(
-    calculateDocumentTotal(
-      subtotal.toString(),
-      quotationDiscount.toString(),
-      taxAmount.toString()
-    ).toString()
+    calculateDocumentTotal(items, quotationDiscount.toString()).toString()
   );
   return {
     subtotal,
@@ -335,7 +335,20 @@ export async function convertQuotationToSale(formData: FormData) {
   return prisma.$transaction(async (tx) => {
     const quotation = await tx.quotation.findUniqueOrThrow({
       where: { id: data.quotationId },
-      include: { items: true },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                suppliers: {
+                  where: { isPreferred: true },
+                  orderBy: { updatedAt: 'desc' },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     await requireBranchAccess(quotation.branchId);
@@ -362,18 +375,25 @@ export async function convertQuotationToSale(formData: FormData) {
         quotationId: quotation.id,
         repairId: quotation.repairId,
         items: {
-          create: quotation.items.map((item) => ({
-            productId: item.productId,
-            sku: item.sku,
-            productName: item.productName,
-            productType: item.productType,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-            subtotal: item.subtotal,
-            total: item.total,
-            fulfillmentStatus: item.fulfillmentStatus,
-          })),
+          create: quotation.items.map((item) => {
+            const unitCost =
+              item.product.suppliers[0]?.unitCost || new Prisma.Decimal(0);
+
+            return {
+              productId: item.productId,
+              sku: item.sku,
+              productName: item.productName,
+              productType: item.productType,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              unitCost: unitCost,
+              discount: item.discount,
+              subtotal: item.subtotal,
+              taxAmount: item.taxAmount,
+              total: item.total,
+              fulfillmentStatus: item.fulfillmentStatus,
+            };
+          }),
         },
       },
     });

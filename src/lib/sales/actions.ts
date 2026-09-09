@@ -121,7 +121,11 @@ export async function getSale(id: string) {
 }
 
 function calculateSaleTotals(
-  items: { subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal }[],
+  items: {
+    subtotal: Prisma.Decimal;
+    discount: Prisma.Decimal;
+    taxAmount: Prisma.Decimal;
+  }[],
   saleDiscount: Prisma.Decimal
 ) {
   const subtotal = new Prisma.Decimal(
@@ -129,11 +133,7 @@ function calculateSaleTotals(
   );
   const taxAmount = new Prisma.Decimal(calculateDocumentTax(items).toString());
   const total = new Prisma.Decimal(
-    calculateDocumentTotal(
-      subtotal.toString(),
-      saleDiscount.toString(),
-      taxAmount.toString()
-    ).toString()
+    calculateDocumentTotal(items, saleDiscount.toString()).toString()
   );
   return {
     subtotal,
@@ -206,11 +206,18 @@ export async function addSaleItem(formData: FormData) {
     // 2. Fetch authoritative product price and tax rate
     const product = await tx.product.findUniqueOrThrow({
       where: { id: data.productId },
-      include: { taxRate: true },
+      include: {
+        taxRate: true,
+        suppliers: {
+          where: { isPreferred: true },
+          orderBy: { updatedAt: 'desc' },
+        },
+      },
     });
 
     // 3. Exact decimal calculations
     const unitPrice = product.sellingPrice;
+    const unitCost = product.suppliers[0]?.unitCost || new Prisma.Decimal(0);
     const itemDiscount = new Prisma.Decimal(data.discount);
     const taxRate = product.taxRate?.rate || 0;
 
@@ -244,6 +251,7 @@ export async function addSaleItem(formData: FormData) {
         productType: product.type,
         quantity: data.quantity,
         unitPrice: unitPrice,
+        unitCost: unitCost,
         discount: itemDiscount,
         subtotal: lineSubtotal,
         taxAmount: lineTax,

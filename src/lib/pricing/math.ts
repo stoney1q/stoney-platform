@@ -56,12 +56,16 @@ export function calculateLineTotal(
  * @returns The sum of all line totals
  */
 export function calculateDocumentSubtotal(
-  items: { subtotal: Decimal | number | string }[]
+  items: {
+    subtotal: Decimal | number | string;
+    discount?: Decimal | number | string;
+  }[]
 ): Decimal {
-  return items.reduce(
-    (sum, item) => sum.add(new Decimal(item.subtotal)),
-    new Decimal(0)
-  );
+  return items.reduce((sum, item) => {
+    const s = new Decimal(item.subtotal);
+    const d = item.discount ? new Decimal(item.discount) : new Decimal(0);
+    return sum.add(s.sub(d));
+  }, new Decimal(0));
 }
 
 export function calculateDocumentTax(
@@ -75,19 +79,28 @@ export function calculateDocumentTax(
 
 /**
  * Calculates the document final total.
+ * @param items Array of items containing line subtotals, discounts, and taxes.
+ * @param documentDiscount The document-level discount to apply to the net total.
+ * @returns The final document total: Sum(Line Total) - Document Discount
  */
 export function calculateDocumentTotal(
-  subtotal: Decimal | number | string,
-  discount: Decimal | number | string,
-  taxAmount: Decimal | number | string
+  items: {
+    subtotal: Decimal | number | string;
+    discount: Decimal | number | string;
+    taxAmount: Decimal | number | string;
+  }[],
+  documentDiscount: Decimal | number | string = 0
 ): Decimal {
-  const s = new Decimal(subtotal);
-  const d = new Decimal(discount);
-  const t = new Decimal(taxAmount);
+  const lineTotalsSum = items.reduce((sum, item) => {
+    return sum.add(
+      calculateLineTotal(item.subtotal, item.discount, item.taxAmount)
+    );
+  }, new Decimal(0));
 
-  const discounted = s.sub(d);
-  const base = discounted.isNegative() ? new Decimal(0) : discounted;
-  return base.add(t);
+  const docDiscount = new Decimal(documentDiscount);
+  const finalTotal = lineTotalsSum.sub(docDiscount);
+
+  return finalTotal.isNegative() ? new Decimal(0) : finalTotal;
 }
 
 /**
