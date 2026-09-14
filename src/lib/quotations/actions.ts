@@ -23,6 +23,11 @@ import {
   calculateDocumentTax,
   calculateDocumentTotal,
 } from '@/lib/pricing/math';
+import {
+  generateDocumentNumber,
+  buildSnapshotData,
+} from '@/lib/documents/actions';
+import { after } from 'next/server';
 
 export async function searchQuotations(options: {
   query?: string;
@@ -303,7 +308,7 @@ export async function updateQuotationStatus(formData: FormData) {
 
   const data = updateQuotationStatusSchema.parse(rawData);
 
-  return prisma.$transaction(async (tx) => {
+  const wasFinalized = await prisma.$transaction(async (tx) => {
     const quotation = await tx.quotation.findUniqueOrThrow({
       where: { id: data.quotationId },
     });
@@ -315,11 +320,46 @@ export async function updateQuotationStatus(formData: FormData) {
       throw new Error('Cannot change status of a CONVERTED quotation');
     }
 
-    return tx.quotation.update({
-      where: { id: quotation.id },
-      data: { status: data.status },
-    });
+    let wasFinalized = false;
+
+    if (
+      (data.status === QuotationStatus.SENT ||
+        data.status === QuotationStatus.ACCEPTED) &&
+      !quotation.documentNumber
+    ) {
+      const documentNumber = await generateDocumentNumber(
+        tx,
+        quotation.branchId,
+        'QUO'
+      );
+      const snapshotData = await buildSnapshotData(quotation.branchId, tx);
+
+      wasFinalized = true;
+      await tx.quotation.update({
+        where: { id: quotation.id },
+        data: {
+          status: data.status,
+          documentNumber,
+          snapshotData: snapshotData as Prisma.InputJsonValue,
+        },
+      });
+    } else {
+      await tx.quotation.update({
+        where: { id: quotation.id },
+        data: { status: data.status },
+      });
+    }
+
+    return wasFinalized;
   });
+
+  if (wasFinalized) {
+    after(async () => {
+      const { generateDocumentPdf } =
+        await import('@/lib/documents/pdf-generator');
+      generateDocumentPdf(data.quotationId, 'QUOTATION').catch(console.error);
+    });
+  }
 }
 
 export async function convertQuotationToSale(formData: FormData) {

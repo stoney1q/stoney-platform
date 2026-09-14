@@ -14,6 +14,14 @@ export interface MediaStorage {
   generatePresignedUploadUrl(config: PresignedUploadConfig): Promise<string>;
 
   /**
+   * Generates a presigned URL for downloading a file directly from storage.
+   */
+  generatePresignedDownloadUrl(
+    path: string,
+    expirationMs: number
+  ): Promise<string>;
+
+  /**
    * Deletes an object from storage.
    */
   deleteObject(path: string): Promise<void>;
@@ -24,13 +32,22 @@ export interface MediaStorage {
   getObjectStream(path: string): NodeJS.ReadableStream;
 
   /**
+   * Saves a buffer directly to storage (server-side only).
+   */
+  saveBuffer(path: string, buffer: Buffer, contentType: string): Promise<void>;
+
+  /**
    * Gets the metadata of an object.
    */
-  getObjectMetadata(path: string): Promise<{ size: number; contentType: string } | null>;
+  getObjectMetadata(
+    path: string
+  ): Promise<{ size: number; contentType: string } | null>;
 }
 
 class GCSMediaStorage implements MediaStorage {
-  async generatePresignedUploadUrl(config: PresignedUploadConfig): Promise<string> {
+  async generatePresignedUploadUrl(
+    config: PresignedUploadConfig
+  ): Promise<string> {
     const bucket = getFirebaseAdminStorage().bucket();
     const file = bucket.file(config.path);
 
@@ -47,12 +64,33 @@ class GCSMediaStorage implements MediaStorage {
     return url;
   }
 
+  async generatePresignedDownloadUrl(
+    path: string,
+    expirationMs: number
+  ): Promise<string> {
+    const bucket = getFirebaseAdminStorage().bucket();
+    const file = bucket.file(path);
+
+    const [url] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + expirationMs,
+    });
+
+    return url;
+  }
+
   async deleteObject(path: string): Promise<void> {
     const bucket = getFirebaseAdminStorage().bucket();
     try {
       await bucket.file(path).delete();
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: number }).code === 404) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: number }).code === 404
+      ) {
         // Ignore not found errors during deletion
         return;
       }
@@ -65,7 +103,21 @@ class GCSMediaStorage implements MediaStorage {
     return bucket.file(path).createReadStream();
   }
 
-  async getObjectMetadata(path: string): Promise<{ size: number; contentType: string } | null> {
+  async saveBuffer(
+    path: string,
+    buffer: Buffer,
+    contentType: string
+  ): Promise<void> {
+    const bucket = getFirebaseAdminStorage().bucket();
+    await bucket.file(path).save(buffer, {
+      contentType,
+      resumable: false,
+    });
+  }
+
+  async getObjectMetadata(
+    path: string
+  ): Promise<{ size: number; contentType: string } | null> {
     const bucket = getFirebaseAdminStorage().bucket();
     try {
       const [metadata] = await bucket.file(path).getMetadata();
@@ -74,7 +126,12 @@ class GCSMediaStorage implements MediaStorage {
         contentType: metadata.contentType || 'application/octet-stream',
       };
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: number }).code === 404) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: number }).code === 404
+      ) {
         return null;
       }
       throw error;

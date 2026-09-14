@@ -28,6 +28,7 @@ import {
 } from '@/generated/prisma/client';
 import { useStoreSettings } from '@/lib/settings/context';
 import Link from 'next/link';
+import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
 
 type QuotationWithRelations = Quotation & {
   customer: Customer;
@@ -386,6 +387,26 @@ export function QuotationDetailsClient({
           </div>
         )}
       </div>
+
+      {(quotation.status === 'SENT' ||
+        quotation.status === 'ACCEPTED' ||
+        quotation.status === 'CONVERTED') &&
+        quotation.snapshotData && (
+          <ReceiptTemplate
+            documentNumber={quotation.documentNumber}
+            type="QUOTATION"
+            snapshotData={quotation.snapshotData}
+            customer={quotation.customer}
+            items={quotation.items}
+            totals={{
+              subtotal: quotation.subtotal,
+              taxAmount: quotation.taxAmount,
+              discount: quotation.discount,
+              total: quotation.total,
+            }}
+            date={new Date(quotation.createdAt)}
+          />
+        )}
     </div>
   );
 }

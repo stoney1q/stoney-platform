@@ -20,6 +20,11 @@ import {
 } from './validation';
 import { RepairStatus, MovementType, Prisma } from '@/generated/prisma/client';
 import { storage } from '../media/storage';
+import {
+  generateDocumentNumber,
+  buildSnapshotData,
+} from '@/lib/documents/actions';
+import { after } from 'next/server';
 
 export async function createRepair(formData: FormData) {
   const session = await requireAuth();
@@ -84,19 +89,30 @@ export async function updateRepairStatus(formData: FormData) {
 
   const data = updateRepairStatusSchema.parse(rawData);
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const repair = await tx.repair.findUniqueOrThrow({
       where: { id: data.repairId },
     });
 
     await requireBranchAccess(repair.branchId);
 
-    if(
+    if (
       repair.status === RepairStatus.COMPLETED ||
       repair.status === RepairStatus.DELIVERED ||
       repair.status === RepairStatus.CANCELLED
     ) {
       throw new Error('Cannot update status of a finalized repair');
+    }
+
+    let documentNumber = repair.documentNumber;
+    let snapshotData = repair.snapshotData;
+
+    if (data.status === RepairStatus.COMPLETED && !repair.documentNumber) {
+      documentNumber = await generateDocumentNumber(tx, repair.branchId, 'REP');
+      snapshotData = (await buildSnapshotData(
+        repair.branchId,
+        tx
+      )) as Prisma.JsonValue;
     }
 
     const updatedRepair = await tx.repair.update({
@@ -106,6 +122,8 @@ export async function updateRepairStatus(formData: FormData) {
         version: { increment: 1 },
         completedAt:
           data.status === RepairStatus.COMPLETED ? new Date() : undefined,
+        documentNumber,
+        snapshotData: snapshotData as Prisma.InputJsonValue,
       },
     });
 
@@ -119,8 +137,21 @@ export async function updateRepairStatus(formData: FormData) {
       },
     });
 
-    return updatedRepair;
+    return {
+      updatedRepair,
+      wasFinalized: !!documentNumber && !repair.documentNumber,
+    };
   });
+
+  if (result.wasFinalized) {
+    after(async () => {
+      const { generateDocumentPdf } =
+        await import('@/lib/documents/pdf-generator');
+      generateDocumentPdf(data.repairId, 'REPAIR').catch(console.error);
+    });
+  }
+
+  return result.updatedRepair;
 }
 
 export async function assignTechnician(formData: FormData) {
@@ -681,7 +712,7 @@ export async function deleteRepair(repairId: string, version: number) {
 
   const repair = await prisma.repair.findUnique({
     where: { id: repairId },
-    include: { media: true }
+    include: { media: true },
   });
 
   if (!repair) return;
@@ -699,12 +730,16 @@ export async function deleteRepair(repairId: string, version: number) {
   return await prisma.$transaction(async (tx) => {
     await tx.mediaAsset.deleteMany({ where: { repairId } });
     return await tx.repair.delete({
-      where: { id: repairId, version }
+      where: { id: repairId, version },
     });
   });
 }
 
-export async function getActiveRepairDiagnostics(branchId: string, deviceModel: string, limit: number = 10) {
+export async function getActiveRepairDiagnostics(
+  branchId: string,
+  deviceModel: string,
+  limit: number = 10
+) {
   const session = await requireAuth();
   await requirePermission('repairs:read');
 

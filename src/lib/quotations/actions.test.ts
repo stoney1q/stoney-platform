@@ -136,6 +136,9 @@ describe('Quotations Actions', () => {
     await prisma.product.deleteMany({ where: { id: mockProductId } });
     await prisma.user.deleteMany({ where: { id: mockUserId } });
     await prisma.role.deleteMany({ where: { id: mockRoleId } });
+    await prisma.branchSequence.deleteMany({
+      where: { branchId: mockBranchId },
+    });
     await prisma.branch.deleteMany({ where: { id: mockBranchId } });
   });
 
