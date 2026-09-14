@@ -31,6 +31,11 @@ import {
   calculateDocumentTax,
   calculateDocumentTotal,
 } from '@/lib/pricing/math';
+import {
+  generateDocumentNumber,
+  buildSnapshotData,
+} from '@/lib/documents/actions';
+import { after } from 'next/server';
 
 export async function searchSales(options: {
   query?: string;
@@ -346,7 +351,8 @@ export async function applyPayment(formData: FormData) {
 
   const data = applyPaymentSchema.parse(rawData);
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    let wasCompleted = false;
     // Lock the Sale row to prevent concurrent payment race conditions
     await tx.$executeRaw`SELECT 1 FROM "Sale" WHERE id = ${data.saleId} FOR UPDATE`;
 
@@ -412,11 +418,21 @@ export async function applyPayment(formData: FormData) {
         }
       }
 
+      const documentNumber = await generateDocumentNumber(
+        tx,
+        sale.branchId,
+        'INV'
+      );
+      const snapshotData = await buildSnapshotData(sale.branchId, tx);
+
+      wasCompleted = true;
       await tx.sale.update({
         where: { id: sale.id },
         data: {
           status: SaleStatus.COMPLETED,
           completedAt: new Date(),
+          documentNumber,
+          snapshotData: snapshotData as Prisma.InputJsonValue,
         },
       });
     }
@@ -467,7 +483,17 @@ export async function applyPayment(formData: FormData) {
         createdById: session.id,
       },
     });
+
+    return { wasCompleted, saleId: sale.id };
   });
+
+  if (result.wasCompleted) {
+    after(async () => {
+      const { generateDocumentPdf } =
+        await import('@/lib/documents/pdf-generator');
+      generateDocumentPdf(result.saleId, 'SALE').catch(console.error);
+    });
+  }
 }
 
 export async function cancelSale(formData: FormData) {

@@ -229,6 +229,9 @@ describe('Sales Foundation Actions', async () => {
     await prisma.product.deleteMany({
       where: { id: { in: [product1Id, product2Id] } },
     });
+    await prisma.branchSequence.deleteMany({
+      where: { branchId: { in: [mainBranchId, otherBranchId] } },
+    });
     await prisma.branch.deleteMany({
       where: { id: { in: [mainBranchId, otherBranchId] } },
     });

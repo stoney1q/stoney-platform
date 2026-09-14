@@ -85,7 +85,10 @@ describe('Repairs Actions', () => {
     await prisma.shift.deleteMany({ where: { branchId } });
     await prisma.user.deleteMany({ where: { branchId } });
     if (roleId) await prisma.role.deleteMany({ where: { id: roleId } });
-    if (branchId) await prisma.branch.deleteMany({ where: { id: branchId } });
+    if (branchId) {
+      await prisma.branchSequence.deleteMany({ where: { branchId } });
+      await prisma.branch.deleteMany({ where: { id: branchId } });
+    }
   });
 
   beforeEach(async () => {

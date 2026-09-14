@@ -29,6 +29,7 @@ import {
 } from '@/generated/prisma/client';
 import { ReturnItemDialog } from './return-item-dialog';
 import { useStoreSettings } from '@/lib/settings/context';
+import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
 
 type SaleWithRelations = Sale & {
   customer: Customer;
@@ -480,6 +481,28 @@ export function SaleDetailsClient({
           </div>
         )}
       </div>
+
+      {sale.status === 'COMPLETED' && sale.snapshotData && (
+        <ReceiptTemplate
+          documentNumber={sale.documentNumber}
+          type="SALE"
+          snapshotData={sale.snapshotData}
+          customer={sale.customer}
+          items={sale.items}
+          totals={{
+            subtotal: sale.subtotal,
+            taxAmount: sale.taxAmount,
+            discount: sale.discount,
+            total: sale.total,
+          }}
+          payments={sale.payments}
+          date={
+            sale.completedAt
+              ? new Date(sale.completedAt)
+              : new Date(sale.createdAt)
+          }
+        />
+      )}
     </div>
   );
 }

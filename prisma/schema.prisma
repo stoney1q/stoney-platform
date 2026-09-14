@@ -35,6 +35,7 @@ model Branch {
   purchaseOrders PurchaseOrder[]
   stockAudits    StockAudit[]
   shifts         Shift[]
+  branchSequences BranchSequence[]
 }
 
 model Role {
@@ -390,6 +391,10 @@ model Sale {
   quotationId String? @unique
   repairId    String?
 
+  documentNumber  String? @unique
+  snapshotData    Json?
+  documentMediaId String?
+
   items    SaleItem[]
   payments Payment[]
 
@@ -483,6 +488,10 @@ model Quotation {
 
   sale Sale?
 
+  documentNumber  String? @unique
+  snapshotData    Json?
+  documentMediaId String?
+
   repairId String?
   repair   Repair? @relation("RepairQuotations", fields: [repairId], references: [id])
 
@@ -566,6 +575,10 @@ model Repair {
   deviceId          String
   technicianId      String?
   activeQuotationId String? @unique
+
+  documentNumber  String? @unique
+  snapshotData    Json?
+  documentMediaId String?
 
   issue String
   notes String?
@@ -827,4 +840,42 @@ model TaxRate {
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// ==========================================
+// DOCUMENTS & DELIVERY DOMAIN
+// ==========================================
+
+model BranchSequence {
+  id           String @id @default(cuid())
+  branchId     String
+  prefix       String
+  currentValue Int    @default(0)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, prefix])
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  ERROR
+}
+
+model EmailDeliveryLog {
+  id             String         @id @default(cuid())
+  documentId     String
+  email          String
+  status         DeliveryStatus @default(PENDING)
+  idempotencyKey String         @unique
+  error          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([documentId, status])
 }
