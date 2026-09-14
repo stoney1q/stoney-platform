@@ -29,6 +29,7 @@ import {
 import { useStoreSettings } from '@/lib/settings/context';
 import Link from 'next/link';
 import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
+import { DeliveryStatus } from '@/components/documents/delivery-status';
 
 type QuotationWithRelations = Quotation & {
   customer: Customer;
@@ -392,20 +393,23 @@ export function QuotationDetailsClient({
         quotation.status === 'ACCEPTED' ||
         quotation.status === 'CONVERTED') &&
         quotation.snapshotData && (
-          <ReceiptTemplate
-            documentNumber={quotation.documentNumber}
-            type="QUOTATION"
-            snapshotData={quotation.snapshotData}
-            customer={quotation.customer}
-            items={quotation.items}
-            totals={{
-              subtotal: quotation.subtotal,
-              taxAmount: quotation.taxAmount,
-              discount: quotation.discount,
-              total: quotation.total,
-            }}
-            date={new Date(quotation.createdAt)}
-          />
+          <div className="space-y-4">
+            <DeliveryStatus documentId={quotation.id} />
+            <ReceiptTemplate
+              documentNumber={quotation.documentNumber}
+              type="QUOTATION"
+              snapshotData={quotation.snapshotData}
+              customer={quotation.customer}
+              items={quotation.items}
+              totals={{
+                subtotal: quotation.subtotal,
+                taxAmount: quotation.taxAmount,
+                discount: quotation.discount,
+                total: quotation.total,
+              }}
+              date={new Date(quotation.createdAt)}
+            />
+          </div>
         )}
     </div>
   );

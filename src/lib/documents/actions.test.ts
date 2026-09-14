@@ -17,6 +17,10 @@ import * as actions from './actions';
 import { generateDocumentPdf } from './pdf-generator';
 
 vi.mock('@/lib/auth/guard', () => ({
+  requireAuth: vi.fn().mockResolvedValue({
+    role: { name: 'Admin' },
+    permissions: ['admin:global'],
+  }),
   requireBranchAccess: vi.fn().mockResolvedValue(true),
   requirePermission: vi.fn().mockResolvedValue({ id: 'test_doc_user_uid' }),
 }));
@@ -153,11 +157,15 @@ describe('Document Actions', () => {
 
   describe('EmailDeliveryLog', () => {
     beforeEach(async () => {
-      await prisma.emailDeliveryLog.deleteMany();
+      await prisma.emailDeliveryLog.deleteMany({
+        where: {
+          email: { in: ['actions-test@example.com', 'concurrent@example.com'] },
+        },
+      });
     });
 
     it('should ensure SENT EmailDeliveryLog cannot become PENDING', async () => {
-      const email = 'test@example.com';
+      const email = 'actions-test@example.com';
       const type = 'SALE';
       const key = `${type}_${testDocumentId}_${email}`;
 
@@ -203,6 +211,27 @@ describe('Document Actions', () => {
       });
       expect(logs.length).toBe(1);
       expect(logs[0].status).toBe('PENDING');
+    });
+    it('should enforce cross-branch authorization for getDocumentDeliveryLogs', async () => {
+      const { requireAuth, requireBranchAccess } =
+        await import('@/lib/auth/guard');
+
+      // Mock requireAuth to return a regular user without global admin
+      (requireAuth as any).mockResolvedValueOnce({
+        role: { name: 'Staff' },
+        permissions: [],
+      });
+
+      const { getDocumentDeliveryLogs } = await import('./actions');
+
+      // Simulate requireBranchAccess throwing an error for a branch mismatch
+      (requireBranchAccess as any).mockRejectedValueOnce(
+        new Error('Access denied to branch')
+      );
+
+      await expect(getDocumentDeliveryLogs(testDocumentId)).rejects.toThrow(
+        'Access denied to branch'
+      );
     });
   });
 
