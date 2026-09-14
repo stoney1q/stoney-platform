@@ -1,7 +1,11 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { requireBranchAccess, requirePermission } from '@/lib/auth/guard';
+import {
+  requireAuth,
+  requireBranchAccess,
+  requirePermission,
+} from '@/lib/auth/guard';
 import { emailDocumentSchema, crossBranchLookupSchema } from './validation';
 import { storage } from '@/lib/media/storage';
 import { after } from 'next/server';
@@ -239,5 +243,94 @@ export async function regenerateDocumentPdfAction(formData: FormData) {
   after(async () => {
     const { generateDocumentPdf } = await import('./pdf-generator');
     generateDocumentPdf(documentId, type).catch(console.error);
+  });
+}
+
+export async function getDocumentDeliveryLogs(documentId: string) {
+  const session = await requireAuth();
+
+  // Resolve branch ID by checking all document types
+  const [sale, quotation, repair] = await Promise.all([
+    prisma.sale.findUnique({
+      where: { id: documentId },
+      select: { branchId: true },
+    }),
+    prisma.quotation.findUnique({
+      where: { id: documentId },
+      select: { branchId: true },
+    }),
+    prisma.repair.findUnique({
+      where: { id: documentId },
+      select: { branchId: true },
+    }),
+  ]);
+
+  const branchId = sale?.branchId || quotation?.branchId || repair?.branchId;
+
+  if (branchId) {
+    await requireBranchAccess(branchId);
+  } else {
+    // If document is not found, fallback to global admin check or deny
+    if (
+      session.role.name !== 'Super Admin' &&
+      !session.permissions.includes('admin:global')
+    ) {
+      throw new Error('Access denied');
+    }
+  }
+
+  return prisma.emailDeliveryLog.findMany({
+    where: { documentId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function retryDocumentEmail(logId: string) {
+  const session = await requireAuth();
+
+  const log = await prisma.emailDeliveryLog.findUnique({
+    where: { id: logId },
+  });
+
+  if (!log) throw new Error('Delivery log not found');
+
+  // Basic auth check using the document's branch
+  // Extract type from idempotencyKey
+  const [type] = log.idempotencyKey.split('_');
+
+  let branchId: string | null = null;
+  if (type === 'SALE') {
+    const doc = await prisma.sale.findUnique({ where: { id: log.documentId } });
+    branchId = doc?.branchId || null;
+  } else if (type === 'QUOTATION') {
+    const doc = await prisma.quotation.findUnique({
+      where: { id: log.documentId },
+    });
+    branchId = doc?.branchId || null;
+  } else if (type === 'REPAIR') {
+    const doc = await prisma.repair.findUnique({
+      where: { id: log.documentId },
+    });
+    branchId = doc?.branchId || null;
+  }
+
+  if (branchId) {
+    await requireBranchAccess(branchId);
+  } else {
+    // If we can't resolve branch, require global as fallback to be safe
+    if (
+      session.role.name !== 'Super Admin' &&
+      !session.permissions.includes('admin:global')
+    ) {
+      throw new Error('Access denied');
+    }
+  }
+
+  await prisma.emailDeliveryLog.update({
+    where: { id: logId },
+    data: {
+      status: 'PENDING',
+      error: null,
+    },
   });
 }

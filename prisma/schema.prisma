@@ -862,6 +862,7 @@ model BranchSequence {
 
 enum DeliveryStatus {
   PENDING
+  PROCESSING
   SENT
   ERROR
 }
@@ -878,4 +879,6 @@ model EmailDeliveryLog {
   updatedAt DateTime @updatedAt
 
   @@index([documentId, status])
+  @@index([status, createdAt])
+  @@index([status, updatedAt])
 }

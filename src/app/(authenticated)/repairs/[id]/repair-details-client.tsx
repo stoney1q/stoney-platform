@@ -21,6 +21,7 @@ import {
 } from '@/lib/repairs/actions';
 import { RepairMediaCard } from '@/components/media/repair-media-card';
 import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
+import { DeliveryStatus } from '@/components/documents/delivery-status';
 import { Decimal } from 'decimal.js';
 import type { Prisma } from '@/generated/prisma/client';
 import type {
@@ -437,29 +438,32 @@ export function RepairDetailsClient({
       <RepairMediaCard repairId={repair.id} isFinalized={isFinalized} />
 
       {isFinalized && repair.snapshotData && (
-        <ReceiptTemplate
-          documentNumber={repair.documentNumber}
-          type="REPAIR"
-          snapshotData={repair.snapshotData}
-          customer={repair.customer}
-          items={repair.parts.map((p) => ({
-            productName: p.product.name,
-            quantity: p.consumedQuantity,
-            unitPrice: p.product.sellingPrice,
-            total: p.product.sellingPrice.mul(p.consumedQuantity),
-          }))}
-          totals={{
-            subtotal: new Decimal(0) as any,
-            taxAmount: new Decimal(0) as any,
-            discount: new Decimal(0) as any,
-            total: new Decimal(0) as any,
-          }}
-          date={
-            repair.completedAt
-              ? new Date(repair.completedAt)
-              : new Date(repair.createdAt)
-          }
-        />
+        <div className="space-y-4">
+          <DeliveryStatus documentId={repair.id} />
+          <ReceiptTemplate
+            documentNumber={repair.documentNumber}
+            type="REPAIR"
+            snapshotData={repair.snapshotData}
+            customer={repair.customer}
+            items={repair.parts.map((p) => ({
+              productName: p.product.name,
+              quantity: p.consumedQuantity,
+              unitPrice: p.product.sellingPrice,
+              total: p.product.sellingPrice.mul(p.consumedQuantity),
+            }))}
+            totals={{
+              subtotal: new Decimal(0) as any,
+              taxAmount: new Decimal(0) as any,
+              discount: new Decimal(0) as any,
+              total: new Decimal(0) as any,
+            }}
+            date={
+              repair.completedAt
+                ? new Date(repair.completedAt)
+                : new Date(repair.createdAt)
+            }
+          />
+        </div>
       )}
     </div>
   );

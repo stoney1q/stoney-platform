@@ -3,11 +3,24 @@ import { apiHandler } from '@/lib/api/handler';
 import { upsertAuditItem } from '@/lib/inventory/audit-actions';
 import { z } from 'zod';
 
-const bodySchema = z.object({
-  productId: z.string().min(1),
-  quantity: z.number().int(),
-  mode: z.enum(['set', 'increment']).default('increment'),
-});
+const bodySchema = z
+  .object({
+    productId: z.string().min(1),
+    quantity: z.number().int(),
+    mode: z.enum(['set', 'increment']).default('increment'),
+  })
+  .refine(
+    (data) => {
+      if (data.mode === 'set') {
+        return data.quantity >= 0;
+      }
+      return true;
+    },
+    {
+      message: "Quantity cannot be negative when mode is 'set'",
+      path: ['quantity'],
+    }
+  );
 
 export const POST = apiHandler(async (req: NextRequest, context: unknown) => {
   const { params } = context as { params: { id: string } };
