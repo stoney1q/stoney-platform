@@ -173,6 +173,7 @@ export async function addQuotationItem(formData: FormData) {
     productId: formData.get('productId') as string,
     quantity: Number(formData.get('quantity')),
     discount: Number(formData.get('discount') || 0),
+    version: Number(formData.get('version')),
   };
 
   const data = addQuotationItemSchema.parse(rawData);
@@ -243,11 +244,12 @@ export async function addQuotationItem(formData: FormData) {
     } = calculateQuotationTotals(updatedItems, quotation.discount);
 
     await tx.quotation.update({
-      where: { id: quotation.id },
+      where: { id: quotation.id, version: data.version },
       data: {
         subtotal: qSub,
         taxAmount: qTax,
         total: qTot,
+        version: { increment: 1 },
       },
     });
   });
@@ -259,6 +261,7 @@ export async function removeQuotationItem(formData: FormData) {
   const rawData = {
     quotationId: formData.get('quotationId') as string,
     quotationItemId: formData.get('quotationItemId') as string,
+    version: Number(formData.get('version')),
   };
 
   const data = removeQuotationItemSchema.parse(rawData);
@@ -288,11 +291,12 @@ export async function removeQuotationItem(formData: FormData) {
     } = calculateQuotationTotals(updatedItems, quotation.discount);
 
     await tx.quotation.update({
-      where: { id: quotation.id },
+      where: { id: quotation.id, version: data.version },
       data: {
         subtotal: qSub,
         taxAmount: qTax,
         total: qTot,
+        version: { increment: 1 },
       },
     });
   });
@@ -304,6 +308,7 @@ export async function updateQuotationStatus(formData: FormData) {
   const rawData = {
     quotationId: formData.get('quotationId') as string,
     status: formData.get('status') as QuotationStatus,
+    version: Number(formData.get('version')),
   };
 
   const data = updateQuotationStatusSchema.parse(rawData);
@@ -336,17 +341,21 @@ export async function updateQuotationStatus(formData: FormData) {
 
       wasFinalized = true;
       await tx.quotation.update({
-        where: { id: quotation.id },
+        where: { id: quotation.id, version: data.version },
         data: {
           status: data.status,
           documentNumber,
           snapshotData: snapshotData as Prisma.InputJsonValue,
+          version: { increment: 1 },
         },
       });
     } else {
       await tx.quotation.update({
-        where: { id: quotation.id },
-        data: { status: data.status },
+        where: { id: quotation.id, version: data.version },
+        data: {
+          status: data.status,
+          version: { increment: 1 },
+        },
       });
     }
 
@@ -368,6 +377,7 @@ export async function convertQuotationToSale(formData: FormData) {
 
   const rawData = {
     quotationId: formData.get('quotationId') as string,
+    version: Number(formData.get('version')),
   };
 
   const data = convertQuotationToSaleSchema.parse(rawData);
@@ -439,8 +449,11 @@ export async function convertQuotationToSale(formData: FormData) {
     });
 
     await tx.quotation.update({
-      where: { id: quotation.id },
-      data: { status: QuotationStatus.CONVERTED },
+      where: { id: quotation.id, version: data.version },
+      data: {
+        status: QuotationStatus.CONVERTED,
+        version: { increment: 1 },
+      },
     });
 
     return sale;
