@@ -22,12 +22,14 @@ export async function sendDocumentEmail(
   // Fetch the basic document details to build the email
   let documentNumber = '';
   let branchId = '';
+  let portalToken = '';
 
   if (type === 'SALE') {
     const doc = await prisma.sale.findUnique({ where: { id: documentId } });
     if (!doc) throw new Error('Document not found');
     documentNumber = doc.documentNumber || doc.id;
     branchId = doc.branchId;
+    // Sales don't use portalToken currently
   } else if (type === 'QUOTATION') {
     const doc = await prisma.quotation.findUnique({
       where: { id: documentId },
@@ -35,11 +37,13 @@ export async function sendDocumentEmail(
     if (!doc) throw new Error('Document not found');
     documentNumber = doc.documentNumber || doc.id;
     branchId = doc.branchId;
+    portalToken = doc.portalToken;
   } else if (type === 'REPAIR') {
     const doc = await prisma.repair.findUnique({ where: { id: documentId } });
     if (!doc) throw new Error('Document not found');
     documentNumber = doc.documentNumber || doc.id;
     branchId = doc.branchId;
+    portalToken = doc.portalToken;
   }
 
   // Fetch branch details
@@ -55,13 +59,22 @@ export async function sendDocumentEmail(
       <h2 style="color: #333;">Your ${displayType} Document from ${branch?.name || 'Stoney Platform'}</h2>
       <p>Hello,</p>
       <p>Please find attached the document <strong>${documentNumber}</strong> for your recent transaction.</p>
-      <div style="margin: 30px 0;">
-        <a href="${signedUrl}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">
-          View ${displayType} Document
+      <div style="margin: 30px 0; display: flex; gap: 10px;">
+        <a href="${signedUrl}" style="background-color: #f3f4f6; color: #111827; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; border: 1px solid #d1d5db;">
+          Download PDF
         </a>
+        ${
+          portalToken
+            ? `
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/portal/${portalToken}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+          View & Track Online
+        </a>
+        `
+            : ''
+        }
       </div>
       <p style="color: #666; font-size: 14px;">
-        This link is secure and will expire in 7 days.<br>
+        The PDF link is secure and will expire in 7 days.<br>
         If you have any questions, please contact us at ${branch?.email || 'support'}.
       </p>
       <hr style="border: none; border-top: 1px solid #eaeaea; margin-top: 40px;" />
