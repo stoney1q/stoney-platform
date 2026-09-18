@@ -6,6 +6,7 @@ import {
   requireAuth,
 } from '@/lib/auth/guard';
 import * as service from './service';
+import { logger } from '@/lib/observability/logger';
 import {
   CreatePurchaseOrderValues,
   ReceivePurchaseOrderValues,
@@ -16,7 +17,7 @@ import prisma from '@/lib/prisma';
 
 function handleActionError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error('Purchase Order action error:', message);
+  logger.error('Purchase Order action error', error);
   return { success: false as const, error: message, data: undefined };
 }
 

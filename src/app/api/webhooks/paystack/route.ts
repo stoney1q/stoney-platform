@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyWebhookSignature } from '@/lib/paystack/client';
 import { prisma } from '@/lib/prisma';
 import { Prisma, PaymentMethod } from '@/generated/prisma/client';
+import { logger } from '@/lib/observability/logger';
 
 export async function POST(req: Request) {
   try {
@@ -35,16 +36,19 @@ export async function POST(req: Request) {
       !metadata.portalToken ||
       metadata.amountPesewas === undefined
     ) {
-      console.error(
-        'Paystack Webhook Security: Missing metadata binding for reference',
-        reference
+      logger.error(
+        'Paystack Webhook Security: Missing metadata binding',
+        undefined,
+        { reference }
       );
       return NextResponse.json({ error: 'Invalid metadata' }, { status: 400 });
     }
 
     const amountPesewas = data.amount;
     if (amountPesewas !== metadata.amountPesewas) {
-      console.error('Paystack Webhook Security: Amount mismatch', reference);
+      logger.error('Paystack Webhook Security: Amount mismatch', undefined, {
+        reference,
+      });
       return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 });
     }
 
@@ -58,7 +62,7 @@ export async function POST(req: Request) {
       });
 
       if (existingPayment) {
-        console.log(`Payment ${reference} already processed.`);
+        logger.info(`Payment already processed.`, { reference });
         return;
       }
 
@@ -115,11 +119,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Paystack Webhook Error:', error.message);
-    } else {
-      console.error('Paystack Webhook Error:', error);
-    }
+    logger.error('Paystack Webhook Error', error);
     // Return 200 for logical errors (like spoofing) so Paystack stops retrying,
     // but log it heavily. For systemic DB issues, 500 might be appropriate, but
     // failing the webhook repeatedly might get the endpoint disabled.

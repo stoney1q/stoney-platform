@@ -1,5 +1,6 @@
 import 'server-only';
 import { cookies, headers } from 'next/headers';
+import { logger } from '@/lib/observability/logger';
 
 import {
   getFirebaseAdminAuth,
@@ -50,7 +51,7 @@ export async function getCurrentUser(
 
   try {
     const adminAuth = getFirebaseAdminAuth();
-        // Support Bearer Token for API Routes
+    // Support Bearer Token for API Routes
     let authHeader: string | null = null;
     try {
       const headersList = await headers();
@@ -207,7 +208,7 @@ export async function getCurrentUser(
       permissions: Array.from(new Set(permissions)),
     };
   } catch (error) {
-    console.error('getCurrentUser Error:', error);
+    logger.error('getCurrentUser Error', error);
     return null;
   }
 }

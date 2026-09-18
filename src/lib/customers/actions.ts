@@ -3,11 +3,17 @@
 import { CustomerFormValues } from './validation';
 import * as service from './service';
 import { CustomerDuplicateWarning } from './service';
+import { logger } from '@/lib/observability/logger';
 
 function handleActionError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error('Customer action error:', message);
-  return { success: false as const, error: message, data: undefined, warning: undefined };
+  logger.error('Customer action error', error);
+  return {
+    success: false as const,
+    error: message,
+    data: undefined,
+    warning: undefined,
+  };
 }
 
 export async function createCustomer(
@@ -21,10 +27,7 @@ export async function createCustomer(
   }
 }
 
-export async function updateCustomer(
-  id: string,
-  data: CustomerFormValues
-) {
+export async function updateCustomer(id: string, data: CustomerFormValues) {
   try {
     return await service.updateCustomer(id, data);
   } catch (error) {

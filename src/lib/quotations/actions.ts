@@ -27,6 +27,7 @@ import {
   generateDocumentNumber,
   buildSnapshotData,
 } from '@/lib/documents/actions';
+import { logger } from '@/lib/observability/logger';
 import { after } from 'next/server';
 
 export async function searchQuotations(options: {
@@ -366,7 +367,9 @@ export async function updateQuotationStatus(formData: FormData) {
     after(async () => {
       const { generateDocumentPdf } =
         await import('@/lib/documents/pdf-generator');
-      generateDocumentPdf(data.quotationId, 'QUOTATION').catch(console.error);
+      generateDocumentPdf(data.quotationId, 'QUOTATION').catch((e) =>
+        logger.error('Background PDF generation failed', e)
+      );
     });
   }
 }
