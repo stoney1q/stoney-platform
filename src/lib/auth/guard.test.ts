@@ -33,6 +33,13 @@ let mockVerifySessionCookie: (
 };
 
 vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: (cookie: string, checkRevoked: boolean) =>
@@ -41,8 +48,13 @@ vi.mock('../firebase/admin', () => ({
 }));
 
 describe('Authentication & Security', async () => {
-  const { requireAuth, requireRole, requirePermission, requireBranchAccess, requireGlobalAccess } =
-    await import('./guard');
+  const {
+    requireAuth,
+    requireRole,
+    requirePermission,
+    requireBranchAccess,
+    requireGlobalAccess,
+  } = await import('./guard');
   const prisma = (await import('../prisma')).default;
 
   let branchHQ: { id: string };
@@ -411,7 +423,12 @@ describe('Authentication & Security', async () => {
       let addedPerm = false;
       if (globalPerm) {
         await prisma.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId: roleManager.id, permissionId: globalPerm.id } },
+          where: {
+            roleId_permissionId: {
+              roleId: roleManager.id,
+              permissionId: globalPerm.id,
+            },
+          },
           create: { roleId: roleManager.id, permissionId: globalPerm.id },
           update: {},
         });
@@ -431,7 +448,12 @@ describe('Authentication & Security', async () => {
       // Cleanup
       if (globalPerm && addedPerm) {
         await prisma.rolePermission.delete({
-          where: { roleId_permissionId: { roleId: roleManager.id, permissionId: globalPerm.id } },
+          where: {
+            roleId_permissionId: {
+              roleId: roleManager.id,
+              permissionId: globalPerm.id,
+            },
+          },
         });
       }
     });

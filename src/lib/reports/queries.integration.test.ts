@@ -111,13 +111,12 @@ describe('Reporting Integration Tests (Product Performance)', () => {
   });
 
   beforeEach(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(requirePermission).mockResolvedValue({
       id: cashierId,
       role: { name: 'Admin' },
       permissions: ['reports:read', 'admin:global'],
       branchId: branchId,
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
     await prisma.saleItem.deleteMany({
       where: { sale: { branchId } },
@@ -130,7 +129,7 @@ describe('Reporting Integration Tests (Product Performance)', () => {
   // Test 1: Taxable sales
   it('correctly allocates revenue for fully taxable sales without discounts', async () => {
     // 1 item, $100 subtotal, $10 tax = $110 total
-    const sale = await prisma.sale.create({
+    await prisma.sale.create({
       data: {
         branchId,
         createdById: cashierId,

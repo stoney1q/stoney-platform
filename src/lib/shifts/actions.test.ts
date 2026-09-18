@@ -5,13 +5,8 @@ import {
   closeShift,
   addCashMovement,
   getActiveShift,
-  getHistoricalShifts,
 } from './actions';
-import {
-  PaymentMethod,
-  ShiftStatus,
-  CashMovementType,
-} from '@/generated/prisma/client';
+import { ShiftStatus, CashMovementType } from '@/generated/prisma/client';
 import { requireAuth } from '@/lib/auth/guard';
 
 function createFormData(data: Record<string, string>) {
@@ -35,8 +30,9 @@ describe('Shift Actions', () => {
     role: { name: 'Cashier' },
   };
   beforeEach(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(requireAuth).mockResolvedValue(mockUser as any);
+    vi.mocked(requireAuth).mockResolvedValue(
+      mockUser as unknown as Awaited<ReturnType<typeof requireAuth>>
+    );
     await prisma.cashMovement.deleteMany({
       where: { shift: { branchId: 'branch-1' } },
     });

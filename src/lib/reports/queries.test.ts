@@ -1,17 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getSalesRevenueReport,
   getSalesStatusReport,
-  getRepairStatusReport,
-  getQuotationStatusReport,
   getInventoryMovementReport,
   getProductPerformanceReport,
   getProfitabilityReport,
-  getShiftReconciliationReport,
 } from './queries';
 import { exportReportCSV } from './actions';
-import { resolveDateRangeUTCBounds, formatToBusinessDate } from './utils';
+import { resolveDateRangeUTCBounds } from './utils';
 import prisma from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth/guard';
 
@@ -38,14 +34,6 @@ describe('Reporting & Analytics Adversarial Tests', () => {
     vi.clearAllMocks();
   });
 
-  const runAllReports = async (branchId?: string) => {
-    await getSalesRevenueReport({ branchId });
-    await getSalesStatusReport({ branchId });
-    await getRepairStatusReport({ branchId });
-    await getQuotationStatusReport({ branchId });
-    await getInventoryMovementReport({ branchId });
-  };
-
   describe('RBAC & Branch Isolation', () => {
     it('1. unauthorized user rejected (reports:read)', async () => {
       vi.mocked(requirePermission).mockRejectedValue(new Error('Forbidden'));
@@ -58,7 +46,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
       await getSalesStatusReport();
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -73,7 +61,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
       await getSalesStatusReport({ branchId: 'tampered-branch-2' });
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -88,7 +76,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
       // Passing undefined to ask for global
       await getSalesStatusReport({ branchId: undefined });
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
@@ -104,7 +92,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Admin' },
         permissions: ['admin:global', 'reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
       await getSalesStatusReport({ branchId: 'branch-3' });
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -119,7 +107,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Super Admin' },
         permissions: ['admin:global', 'reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
       await getSalesStatusReport();
       expect(prisma.sale.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -144,7 +132,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
             role: { name: 'Manager' },
             permissions: ['reports:read', 'reports:export'],
             branchId: 'branch-1',
-          } as any;
+          } as unknown as Awaited<ReturnType<typeof requirePermission>>;
         }
         throw new Error('Forbidden');
       });
@@ -164,7 +152,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Admin' },
         permissions: ['admin:global', 'reports:read', 'reports:export'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
       vi.mocked(prisma.sale.groupBy).mockResolvedValueOnce([
         { status: '=cmd|/c', _count: { id: 1 }, _sum: { total: null } },
@@ -173,7 +161,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
           _count: { id: 2 },
           _sum: { total: null },
         },
-      ] as any);
+      ] as unknown as Awaited<ReturnType<typeof prisma.sale.groupBy>>);
 
       const csv = await exportReportCSV('salesStatus');
 
@@ -236,7 +224,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
       // Return a Decimal to test serialization
       vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
@@ -245,7 +233,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
           revenue: { toFixed: () => '123.45' },
           txCount: BigInt(5),
         },
-      ] as any);
+      ] as unknown as Awaited<ReturnType<typeof prisma.$queryRaw>>);
 
       const result = await getSalesRevenueReport();
       expect(result).toEqual([
@@ -264,7 +252,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
       const result = await getInventoryMovementReport();
       // Only type, count, quantity should exist
@@ -280,7 +268,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
       vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
         {
@@ -288,7 +276,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
           revenue: { toFixed: () => '100.00', valueOf: () => 100 },
           cogs: { toFixed: () => '60.00', valueOf: () => 60 },
         },
-      ] as any);
+      ] as unknown as Awaited<ReturnType<typeof prisma.$queryRaw>>);
 
       const result = await getProfitabilityReport();
       // Rev is mocked as 100, Cost is mocked as 60. Margin is (40/100)*100 = 40
@@ -309,7 +297,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
         role: { name: 'Manager' },
         permissions: ['reports:read'],
         branchId: 'branch-1',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof requirePermission>>);
 
       vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
         {
@@ -319,7 +307,7 @@ describe('Reporting & Analytics Adversarial Tests', () => {
           quantitySold: BigInt(10),
           revenue: { toFixed: () => '150.00', valueOf: () => 150 },
         },
-      ] as any);
+      ] as unknown as Awaited<ReturnType<typeof prisma.$queryRaw>>);
 
       const result = await getProductPerformanceReport();
       expect(result).toEqual([

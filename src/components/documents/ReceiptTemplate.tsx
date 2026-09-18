@@ -22,7 +22,7 @@ export type DocumentSnapshotData = {
 type ReceiptTemplateProps = {
   documentNumber: string | null;
   type: 'SALE' | 'REPAIR' | 'QUOTATION';
-  snapshotData: DocumentSnapshotData | any;
+  snapshotData: DocumentSnapshotData;
   customer?: {
     firstName: string;
     lastName: string;

@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import * as assert from 'node:assert';
-import { MovementType, Prisma } from '@/generated/prisma/client';
+import { MovementType } from '@/generated/prisma/client';
 
 const { currentMockCookie } = vi.hoisted(() => ({
   currentMockCookie: { value: undefined as string | undefined },
@@ -18,6 +18,13 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
@@ -45,7 +52,6 @@ describe('Purchases Actions', () => {
   let mainBranchId: string;
   let supplierId: string;
   let productId: string;
-  let managerId: string;
 
   beforeAll(async () => {
     // Force cleanup from previous failed runs
@@ -69,11 +75,9 @@ describe('Purchases Actions', () => {
     const manager = await prisma.user.findFirst({
       where: { firebaseUid: 'po_manager_uid' },
     });
-    if (manager) {
-      managerId = manager.id;
-    } else {
+    if (!manager) {
       // Create test manager if missing from global seed
-      const newManager = await prisma.user.create({
+      await prisma.user.create({
         data: {
           firebaseUid: 'po_manager_uid',
           email: 'po_manager@test.com',
@@ -119,7 +123,6 @@ describe('Purchases Actions', () => {
           branch: { connect: { id: mainBranchId } },
         },
       });
-      managerId = newManager.id;
     }
 
     // Create supplier

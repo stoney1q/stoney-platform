@@ -47,7 +47,7 @@ export async function verifyPortalCookie(): Promise<JWTPayload | null> {
     const secretKey = getSecretKey();
     const { payload } = await jwtVerify(token, secretKey);
     return payload;
-  } catch (error) {
+  } catch {
     // Token is invalid, expired, or signature verification failed
     return null;
   }

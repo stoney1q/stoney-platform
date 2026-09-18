@@ -19,6 +19,13 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
@@ -40,7 +47,9 @@ vi.mock('../firebase/admin', () => ({
 const mockStorage = vi.hoisted(() => ({
   generatePresignedUploadUrl: vi.fn().mockResolvedValue('https://fake-url.com'),
   deleteObject: vi.fn().mockResolvedValue(undefined),
-  getObjectMetadata: vi.fn().mockResolvedValue({ size: 100, contentType: 'image/jpeg' }),
+  getObjectMetadata: vi
+    .fn()
+    .mockResolvedValue({ size: 100, contentType: 'image/jpeg' }),
   getObjectStream: vi.fn(),
 }));
 
@@ -81,7 +90,11 @@ describe('Media Actions & Security', async () => {
       create: { name: 'Branch Manager' },
     });
 
-    const requiredPermissions = ['products:write', 'repairs:write', 'inventory:write'];
+    const requiredPermissions = [
+      'products:write',
+      'repairs:write',
+      'inventory:write',
+    ];
     for (const p of requiredPermissions) {
       const perm = await prisma.permission.upsert({
         where: { name: p },
@@ -89,7 +102,12 @@ describe('Media Actions & Security', async () => {
         create: { name: p, description: p },
       });
       await prisma.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: roleManager.id, permissionId: perm.id } },
+        where: {
+          roleId_permissionId: {
+            roleId: roleManager.id,
+            permissionId: perm.id,
+          },
+        },
         update: {},
         create: { roleId: roleManager.id, permissionId: perm.id },
       });
@@ -97,57 +115,88 @@ describe('Media Actions & Security', async () => {
 
     hqUser = await prisma.user.upsert({
       where: { email: 'hq@test.local' },
-      update: { firebaseUid: 'hq_uid', branchId: branchHQ.id, roleId: roleManager.id },
+      update: {
+        firebaseUid: 'hq_uid',
+        branchId: branchHQ.id,
+        roleId: roleManager.id,
+      },
       create: {
-        firstName: 'HQ', lastName: 'User', email: 'hq@test.local',
-        firebaseUid: 'hq_uid', isActive: true, emailVerified: true,
-        branchId: branchHQ.id, roleId: roleManager.id,
+        firstName: 'HQ',
+        lastName: 'User',
+        email: 'hq@test.local',
+        firebaseUid: 'hq_uid',
+        isActive: true,
+        emailVerified: true,
+        branchId: branchHQ.id,
+        roleId: roleManager.id,
       },
     });
 
     await prisma.user.upsert({
       where: { email: 'other@test.local' },
-      update: { firebaseUid: 'other_inv_uid', branchId: branchOther.id, roleId: roleManager.id },
+      update: {
+        firebaseUid: 'other_inv_uid',
+        branchId: branchOther.id,
+        roleId: roleManager.id,
+      },
       create: {
-        firstName: 'Other', lastName: 'User', email: 'other@test.local',
-        firebaseUid: 'other_inv_uid', isActive: true, emailVerified: true,
-        branchId: branchOther.id, roleId: roleManager.id,
+        firstName: 'Other',
+        lastName: 'User',
+        email: 'other@test.local',
+        firebaseUid: 'other_inv_uid',
+        isActive: true,
+        emailVerified: true,
+        branchId: branchOther.id,
+        roleId: roleManager.id,
       },
     });
 
     testProd = await prisma.product.upsert({
       where: { sku: 'TEST-PROD-MEDIA' },
       update: {},
-      create: { sku: 'TEST-PROD-MEDIA', name: 'Media Prod' }
+      create: { sku: 'TEST-PROD-MEDIA', name: 'Media Prod' },
     });
 
     hqCustomer = await prisma.customer.upsert({
       where: { id: 'TEST-CUSTOMER-1' },
       update: {},
-      create: { id: 'TEST-CUSTOMER-1', firstName: 'HQ', lastName: 'Customer', createdById: hqUser.id }
+      create: {
+        id: 'TEST-CUSTOMER-1',
+        firstName: 'HQ',
+        lastName: 'Customer',
+        createdById: hqUser.id,
+      },
     });
 
     hqDevice = await prisma.device.upsert({
       where: { id: 'TEST-DEVICE-1' },
       update: {},
-      create: { id: 'TEST-DEVICE-1', customerId: hqCustomer.id, make: 'Test', model: 'Device' }
+      create: {
+        id: 'TEST-DEVICE-1',
+        customerId: hqCustomer.id,
+        make: 'Test',
+        model: 'Device',
+      },
     });
 
     // Repair doesn't have a unique field easily guessable, so let's delete any existing one first
     await prisma.repair.deleteMany({
-      where: { deviceId: hqDevice.id }
+      where: { deviceId: hqDevice.id },
     });
 
     otherRepair = await prisma.repair.create({
       data: {
-        branchId: branchOther.id, customerId: hqCustomer.id, deviceId: hqDevice.id, issue: 'Broken'
-      }
+        branchId: branchOther.id,
+        customerId: hqCustomer.id,
+        deviceId: hqDevice.id,
+        issue: 'Broken',
+      },
     });
   });
 
   afterAll(async () => {
     await prisma.mediaAsset.deleteMany({
-      where: { bucket: 'test-bucket.appspot.com' }
+      where: { bucket: 'test-bucket.appspot.com' },
     });
     await prisma.repair.deleteMany({ where: { id: otherRepair.id } });
     await prisma.device.deleteMany({ where: { id: hqDevice.id } });
@@ -155,7 +204,9 @@ describe('Media Actions & Security', async () => {
     await prisma.product.deleteMany({ where: { sku: 'TEST-PROD-MEDIA' } });
     await prisma.product.deleteMany({ where: { sku: 'TEST-DEL-MEDIA' } });
     try {
-      await prisma.user.deleteMany({ where: { email: { in: ['hq@test.local', 'other@test.local'] } } });
+      await prisma.user.deleteMany({
+        where: { email: { in: ['hq@test.local', 'other@test.local'] } },
+      });
     } catch {
       // Ignore user cleanup errors
     }
@@ -169,13 +220,15 @@ describe('Media Actions & Security', async () => {
       entityId: testProd.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'test.jpg'
+      fileName: 'test.jpg',
     });
 
     assert.ok(res.uploadUrl);
     assert.ok(res.assetId);
 
-    const asset = await prisma.mediaAsset.findUnique({ where: { id: res.assetId } });
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: res.assetId },
+    });
     assert.ok(asset);
     assert.strictEqual(asset.state, MediaState.PENDING);
     assert.strictEqual(asset.productId, testProd.id);
@@ -190,10 +243,12 @@ describe('Media Actions & Security', async () => {
       entityId: otherRepair.id,
       mimeType: 'image/png',
       sizeBytes: 2048,
-      fileName: 'private.png'
+      fileName: 'private.png',
     });
 
-    const asset = await prisma.mediaAsset.findUnique({ where: { id: res.assetId } });
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: res.assetId },
+    });
     assert.ok(asset);
     assert.strictEqual(asset.state, MediaState.PENDING);
     assert.strictEqual(asset.repairId, otherRepair.id);
@@ -209,7 +264,7 @@ describe('Media Actions & Security', async () => {
         entityId: otherRepair.id,
         mimeType: 'image/jpeg',
         sizeBytes: 1024,
-        fileName: 'test.jpg'
+        fileName: 'test.jpg',
       }),
       (err: Error) => err.message.includes('Access denied')
     );
@@ -223,7 +278,7 @@ describe('Media Actions & Security', async () => {
         entityId: testProd.id,
         mimeType: 'image/jpeg',
         sizeBytes: 10 * 1024 * 1024,
-        fileName: 'huge.jpg'
+        fileName: 'huge.jpg',
       }),
       (err: Error) => err.message.includes('exceeds the 5MB limit')
     );
@@ -231,77 +286,85 @@ describe('Media Actions & Security', async () => {
 
   it('registers media if storage verification passes', async () => {
     currentMockCookie.value = 'active_hq_user';
-    mockStorage.getObjectMetadata.mockResolvedValueOnce({ size: 1024, contentType: 'image/jpeg' });
-    
+    mockStorage.getObjectMetadata.mockResolvedValueOnce({
+      size: 1024,
+      contentType: 'image/jpeg',
+    });
+
     const { assetId } = await generateUploadUrl({
       entityType: 'product',
       entityId: testProd.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'test2.jpg'
+      fileName: 'test2.jpg',
     });
 
     await registerMedia(assetId);
 
-    const asset = await prisma.mediaAsset.findUnique({ where: { id: assetId } });
+    const asset = await prisma.mediaAsset.findUnique({
+      where: { id: assetId },
+    });
     assert.strictEqual(asset!.state, MediaState.READY);
   });
 
   it('fails to register if storage metadata is missing (not uploaded)', async () => {
     currentMockCookie.value = 'active_hq_user';
     mockStorage.getObjectMetadata.mockResolvedValueOnce(null);
-    
+
     const { assetId } = await generateUploadUrl({
       entityType: 'product',
       entityId: testProd.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'test3.jpg'
+      fileName: 'test3.jpg',
     });
 
-    await assert.rejects(
-      registerMedia(assetId),
-      (err: Error) => err.message.includes('File not found in storage')
+    await assert.rejects(registerMedia(assetId), (err: Error) =>
+      err.message.includes('File not found in storage')
     );
   });
 
   it('fails to register if mime type is forged', async () => {
     currentMockCookie.value = 'active_hq_user';
     // Storage metadata returns application/x-msdownload (exe)
-    mockStorage.getObjectMetadata.mockResolvedValueOnce({ size: 1024, contentType: 'application/x-msdownload' });
-    
+    mockStorage.getObjectMetadata.mockResolvedValueOnce({
+      size: 1024,
+      contentType: 'application/x-msdownload',
+    });
+
     const { assetId } = await generateUploadUrl({
       entityType: 'product',
       entityId: testProd.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'fake.jpg'
+      fileName: 'fake.jpg',
     });
 
-    await assert.rejects(
-      registerMedia(assetId),
-      (err: Error) => err.message.includes('File mime type mismatch')
+    await assert.rejects(registerMedia(assetId), (err: Error) =>
+      err.message.includes('File mime type mismatch')
     );
   });
 
   it('fails to transition from READY to READY', async () => {
     currentMockCookie.value = 'active_hq_user';
-    mockStorage.getObjectMetadata.mockResolvedValueOnce({ size: 1024, contentType: 'image/jpeg' });
-    
+    mockStorage.getObjectMetadata.mockResolvedValueOnce({
+      size: 1024,
+      contentType: 'image/jpeg',
+    });
+
     const { assetId } = await generateUploadUrl({
       entityType: 'product',
       entityId: testProd.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'test4.jpg'
+      fileName: 'test4.jpg',
     });
 
     await registerMedia(assetId);
 
     // Try again
-    await assert.rejects(
-      registerMedia(assetId),
-      (err: Error) => err.message.includes('not in PENDING state')
+    await assert.rejects(registerMedia(assetId), (err: Error) =>
+      err.message.includes('not in PENDING state')
     );
   });
 
@@ -310,17 +373,20 @@ describe('Media Actions & Security', async () => {
     const prod = await prisma.product.upsert({
       where: { sku: 'TEST-DEL-MEDIA' },
       update: {},
-      create: { sku: 'TEST-DEL-MEDIA', name: 'Del Media Prod' }
+      create: { sku: 'TEST-DEL-MEDIA', name: 'Del Media Prod' },
     });
 
-    mockStorage.getObjectMetadata.mockResolvedValueOnce({ size: 1024, contentType: 'image/jpeg' });
-    
+    mockStorage.getObjectMetadata.mockResolvedValueOnce({
+      size: 1024,
+      contentType: 'image/jpeg',
+    });
+
     const { assetId } = await generateUploadUrl({
       entityType: 'product',
       entityId: prod.id,
       mimeType: 'image/jpeg',
       sizeBytes: 1024,
-      fileName: 'del.jpg'
+      fileName: 'del.jpg',
     });
 
     await registerMedia(assetId);

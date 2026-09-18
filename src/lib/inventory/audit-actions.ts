@@ -7,11 +7,7 @@ import {
   requirePermission,
 } from '../auth/guard';
 import { StockAuditStatus, MovementType } from '../../generated/prisma/client';
-import {
-  createAuditSchema,
-  updateAuditStatusSchema,
-  upsertAuditItemSchema,
-} from './audit-validation';
+import { createAuditSchema, upsertAuditItemSchema } from './audit-validation';
 
 export async function createAudit(branchId: string, name?: string) {
   const user = await requireBranchAccess(branchId);
@@ -35,7 +31,7 @@ export async function upsertAuditItem(
   quantity: number,
   mode: 'set' | 'increment'
 ) {
-  const user = await requireAuth();
+  await requireAuth();
   await requirePermission('inventory:write');
   upsertAuditItemSchema.parse({ auditId, productId, quantity, mode });
 
@@ -72,7 +68,7 @@ export async function updateAuditStatus(
   auditId: string,
   status: StockAuditStatus
 ) {
-  const user = await requireAuth();
+  await requireAuth();
   const audit = await prisma.stockAudit.findUnique({ where: { id: auditId } });
   if (!audit) throw new Error('Audit not found');
 

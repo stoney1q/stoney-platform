@@ -28,13 +28,14 @@ export function QuotationActions({
         await customerRejectQuotation(portalToken, version);
       }
       router.refresh();
-    } catch (err: any) {
-      if (err.message === 'DOCUMENT_MODIFIED') {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message === 'DOCUMENT_MODIFIED') {
         setError(
           'This quotation has been updated by the store. Please refresh the page to view the latest version.'
         );
       } else {
-        setError(err.message || 'An error occurred.');
+        setError(message || 'An error occurred.');
       }
     } finally {
       setLoading(false);

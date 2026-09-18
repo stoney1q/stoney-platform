@@ -1,4 +1,4 @@
-import { Shift, CashMovement, User, Prisma } from '@/generated/prisma/client';
+import { CashMovement, Shift, User } from '@/generated/prisma/client';
 
 export type ShiftWithRelations = Shift & {
   user?: Pick<User, 'id' | 'firstName' | 'lastName'>;

@@ -47,8 +47,8 @@ export function GeneralSettingsForm({ initialData }: GeneralSettingsFormProps) {
       });
       await updateStoreSettings(formData);
       toast.success('Settings updated successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update settings');
+    } catch (error: unknown) {
+      toast.error((error as Error).message || 'Failed to update settings');
     } finally {
       setIsSubmitting(false);
     }

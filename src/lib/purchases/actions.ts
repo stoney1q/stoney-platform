@@ -9,10 +9,8 @@ import * as service from './service';
 import {
   CreatePurchaseOrderValues,
   ReceivePurchaseOrderValues,
-  UpdatePurchaseOrderValues,
   createPurchaseOrderSchema,
   receivePurchaseOrderSchema,
-  updatePurchaseOrderSchema,
 } from './validation';
 import prisma from '@/lib/prisma';
 
@@ -35,7 +33,7 @@ export async function getPurchaseOrders(page = 1, limit = 50) {
 
 export async function getPurchaseOrder(id: string) {
   try {
-    const user = await requireAuth();
+    await requireAuth();
     await requirePermission('purchases:read');
 
     const po = await service.getPurchaseOrder(id);
@@ -65,7 +63,7 @@ export async function createPurchaseOrder(data: CreatePurchaseOrderValues) {
 
 export async function markPurchaseOrderOrdered(id: string) {
   try {
-    const user = await requireAuth();
+    await requireAuth();
     await requirePermission('purchases:write');
 
     // Need to verify branch access before mutating
@@ -104,7 +102,7 @@ export async function receivePurchaseOrder(
 
 export async function cancelPurchaseOrder(id: string) {
   try {
-    const user = await requireAuth();
+    await requireAuth();
     await requirePermission('purchases:write');
 
     const po = await prisma.purchaseOrder.findUnique({ where: { id } });
