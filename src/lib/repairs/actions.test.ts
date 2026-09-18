@@ -44,6 +44,16 @@ vi.mock('@/lib/auth/guard', () => ({
   requireBranchAccess: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
+}));
+
 describe('Repairs Actions', () => {
   let branchId: string;
   let customerId: string;
@@ -166,7 +176,7 @@ describe('Repairs Actions', () => {
     const product = await prisma.product.create({
       data: {
         name: 'Screen',
-        sku: 'SCR-1',
+        sku: `SCR-${Date.now()}-${Math.random()}`,
         type: ProductType.GOODS,
         sellingPrice: 100,
       },
@@ -345,7 +355,7 @@ describe('Repairs Actions', () => {
       data: {
         quotationId: quotation.id,
         productId,
-        sku: 'SCR-1',
+        sku: `SCR-${Date.now()}-${Math.random()}`,
         productName: 'Screen',
         quantity: 1,
         unitPrice: 100,
@@ -360,6 +370,7 @@ describe('Repairs Actions', () => {
       (() => {
         const f = new FormData();
         f.set('quotationId', quotation.id);
+        f.set('version', '1');
         return f;
       })()
     );

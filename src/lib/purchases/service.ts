@@ -4,7 +4,6 @@ import { applyStockReceipt } from '@/lib/inventory/actions';
 import {
   CreatePurchaseOrderValues,
   ReceivePurchaseOrderValues,
-  UpdatePurchaseOrderValues,
 } from './validation';
 
 export async function getPurchaseOrders(

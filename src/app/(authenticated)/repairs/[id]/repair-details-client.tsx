@@ -20,10 +20,12 @@ import {
   cancelRepair,
 } from '@/lib/repairs/actions';
 import { RepairMediaCard } from '@/components/media/repair-media-card';
-import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
+import {
+  ReceiptTemplate,
+  DocumentSnapshotData,
+} from '@/components/documents/ReceiptTemplate';
 import { DeliveryStatus } from '@/components/documents/delivery-status';
 import { Decimal } from 'decimal.js';
-import type { Prisma } from '@/generated/prisma/client';
 import type {
   Customer,
   Device,
@@ -443,7 +445,9 @@ export function RepairDetailsClient({
           <ReceiptTemplate
             documentNumber={repair.documentNumber}
             type="REPAIR"
-            snapshotData={repair.snapshotData}
+            snapshotData={
+              repair.snapshotData as unknown as DocumentSnapshotData
+            }
             customer={repair.customer}
             items={repair.parts.map((p) => ({
               productName: p.product.name,
@@ -452,10 +456,10 @@ export function RepairDetailsClient({
               total: p.product.sellingPrice.mul(p.consumedQuantity),
             }))}
             totals={{
-              subtotal: new Decimal(0) as any,
-              taxAmount: new Decimal(0) as any,
-              discount: new Decimal(0) as any,
-              total: new Decimal(0) as any,
+              subtotal: new Decimal(0),
+              taxAmount: new Decimal(0),
+              discount: new Decimal(0),
+              total: new Decimal(0),
             }}
             date={
               repair.completedAt

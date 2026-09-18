@@ -1,4 +1,10 @@
-import { BranchStock, StockMovement, Product } from '@/generated/prisma/client';
+import {
+  BranchStock,
+  StockMovement,
+  Product,
+  StockAudit,
+  StockAuditItem,
+} from '@/generated/prisma/client';
 
 export type BranchStockWithProduct = BranchStock & {
   product?: Product | null;
@@ -43,6 +49,7 @@ export function toSafeStockMovementDTO(
   };
 }
 
-// Minimal placeholder DTOs to fix tsc errors
-export type SafeStockAuditDTO = any;
-export type SafeStockAuditItemDTO = any;
+export type SafeStockAuditItemDTO = StockAuditItem & {
+  product: { name: string; sku: string };
+};
+export type SafeStockAuditDTO = StockAudit & { items: SafeStockAuditItemDTO[] };

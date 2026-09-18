@@ -15,14 +15,16 @@ import { ChatMessage } from './chat-message';
 export function CopilotDrawer() {
   const [open, setOpen] = useState(false);
 
+  const chat = useChat({
+    api: '/api/v1/ai/chat',
+    onError: (err: Error) => {
+      console.error('Chat error:', err);
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  // @ts-expect-error - The 'ai' library types are incompatible or outdated here
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
-    useChat({
-      // @ts-ignore - Ignoring API typing issue
-      api: '/api/v1/ai/chat',
-      onError: (err: Error) => {
-        console.error('Chat error:', err);
-      },
-    }) as any;
+    chat;
 
   if (process.env.NEXT_PUBLIC_ENABLE_COPILOT !== 'true') {
     return null;
@@ -67,11 +69,12 @@ export function CopilotDrawer() {
             </div>
           )}
 
-          {messages.map((m: any, i: number) => (
+          {messages.map((m, i) => (
             <ChatMessage
               key={m.id || `msg-${i}`}
               role={m.role}
-              content={m.content}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              content={(m as any).content}
             />
           ))}
 

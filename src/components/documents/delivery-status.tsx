@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   getDocumentDeliveryLogs,
   retryDocumentEmail,
@@ -14,14 +14,21 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DeliveryStatus as StatusType } from '@/generated/prisma/client';
 
 export function DeliveryStatus({ documentId }: { documentId: string }) {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<
+    {
+      id: string;
+      email: string;
+      status: string;
+      error?: string | null;
+      createdAt: Date | string;
+    }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRetrying, setIsRetrying] = useState<string | null>(null);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const data = await getDocumentDeliveryLogs(documentId);
       setLogs(data);
@@ -30,9 +37,10 @@ export function DeliveryStatus({ documentId }: { documentId: string }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [documentId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLogs();
 
     // Poll every 5 seconds if there are pending logs
@@ -44,6 +52,7 @@ export function DeliveryStatus({ documentId }: { documentId: string }) {
     }
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId, logs]);
 
   const handleRetry = async (logId: string) => {
@@ -52,8 +61,9 @@ export function DeliveryStatus({ documentId }: { documentId: string }) {
       await retryDocumentEmail(logId);
       toast.success('Email queued for retry');
       await fetchLogs();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to retry email');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Failed to retry email');
     } finally {
       setIsRetrying(null);
     }

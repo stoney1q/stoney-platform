@@ -28,7 +28,10 @@ import {
 } from '@/generated/prisma/client';
 import { useStoreSettings } from '@/lib/settings/context';
 import Link from 'next/link';
-import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
+import {
+  ReceiptTemplate,
+  DocumentSnapshotData,
+} from '@/components/documents/ReceiptTemplate';
 import { DeliveryStatus } from '@/components/documents/delivery-status';
 
 type QuotationWithRelations = Quotation & {
@@ -297,7 +300,9 @@ export function QuotationDetailsClient({
                     </TableCell>
                     <TableCell className="text-right">
                       {currencySymbol}
-                      {Number((item as any).taxAmount || 0).toFixed(2)}
+                      {Number(
+                        (item as Record<string, unknown>).taxAmount || 0
+                      ).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {currencySymbol}
@@ -398,7 +403,9 @@ export function QuotationDetailsClient({
             <ReceiptTemplate
               documentNumber={quotation.documentNumber}
               type="QUOTATION"
-              snapshotData={quotation.snapshotData}
+              snapshotData={
+                quotation.snapshotData as unknown as DocumentSnapshotData
+              }
               customer={quotation.customer}
               items={quotation.items}
               totals={{

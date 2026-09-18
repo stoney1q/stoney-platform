@@ -217,15 +217,15 @@ describe('Document Actions', () => {
         await import('@/lib/auth/guard');
 
       // Mock requireAuth to return a regular user without global admin
-      (requireAuth as any).mockResolvedValueOnce({
+      vi.mocked(requireAuth).mockResolvedValueOnce({
         role: { name: 'Staff' },
         permissions: [],
-      });
+      } as unknown as Awaited<ReturnType<typeof requireAuth>>);
 
       const { getDocumentDeliveryLogs } = await import('./actions');
 
       // Simulate requireBranchAccess throwing an error for a branch mismatch
-      (requireBranchAccess as any).mockRejectedValueOnce(
+      vi.mocked(requireBranchAccess).mockRejectedValueOnce(
         new Error('Access denied to branch')
       );
 

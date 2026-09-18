@@ -19,6 +19,13 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {

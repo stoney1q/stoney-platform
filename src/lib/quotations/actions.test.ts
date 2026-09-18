@@ -11,6 +11,16 @@ import {
 import { prisma } from '@/lib/prisma';
 import * as authGuard from '@/lib/auth/guard';
 
+vi.mock('../firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
+}));
+
 vi.mock('@/lib/auth/guard', () => ({
   requireAuth: vi.fn(),
   requirePermission: vi.fn(),
@@ -169,6 +179,7 @@ describe('Quotations Actions', () => {
       addFormData.append('productId', mockProductId);
       addFormData.append('quantity', '2');
       addFormData.append('discount', '10');
+      addFormData.append('version', '1');
 
       await addQuotationItem(addFormData);
 
@@ -176,11 +187,13 @@ describe('Quotations Actions', () => {
       const updateFormData = new FormData();
       updateFormData.append('quotationId', quotation.id);
       updateFormData.append('status', QuotationStatus.ACCEPTED);
+      updateFormData.append('version', '2');
       await updateQuotationStatus(updateFormData);
 
       // Convert
       const convertFormData = new FormData();
       convertFormData.append('quotationId', quotation.id);
+      convertFormData.append('version', '3');
       const sale = await convertQuotationToSale(convertFormData);
 
       // Verify Sale
@@ -203,6 +216,7 @@ describe('Quotations Actions', () => {
 
       const convertFormData = new FormData();
       convertFormData.append('quotationId', quotation.id);
+      convertFormData.append('version', '1');
 
       await assert.rejects(
         convertQuotationToSale(convertFormData),

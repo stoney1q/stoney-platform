@@ -27,6 +27,7 @@ import {
   Category,
   Brand,
 } from '@/generated/prisma/client';
+import { DocumentSnapshotData } from '@/components/documents/ReceiptTemplate';
 import { ReturnItemDialog } from './return-item-dialog';
 import { useStoreSettings } from '@/lib/settings/context';
 import { ReceiptTemplate } from '@/components/documents/ReceiptTemplate';
@@ -343,7 +344,9 @@ export function SaleDetailsClient({
                     </TableCell>
                     <TableCell className="text-right">
                       {currencySymbol}
-                      {Number((item as any).taxAmount || 0).toFixed(2)}
+                      {Number(
+                        (item as Record<string, unknown>).taxAmount || 0
+                      ).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {currencySymbol}
@@ -489,7 +492,7 @@ export function SaleDetailsClient({
           <ReceiptTemplate
             documentNumber={sale.documentNumber}
             type="SALE"
-            snapshotData={sale.snapshotData}
+            snapshotData={sale.snapshotData as unknown as DocumentSnapshotData}
             customer={sale.customer}
             items={sale.items}
             totals={{

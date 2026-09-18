@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { TaxRate } from '@/generated/prisma/client';
 import {
   createTaxRate,
@@ -40,11 +39,12 @@ export function TaxRateForm({ initialData }: TaxRateFormProps) {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm<TaxRateFormValues>({
-    resolver: zodResolver(taxRateSchema) as any,
+    // @ts-expect-error - React Hook Form library types are slightly incompatible with Zod resolver
+    resolver: zodResolver(taxRateSchema) as undefined, // Type cast to bypass strict resolver typing
     defaultValues: {
       name: initialData?.name || '',
       rate: initialData ? Number(initialData.rate) : 0,
@@ -53,8 +53,8 @@ export function TaxRateForm({ initialData }: TaxRateFormProps) {
     },
   });
 
-  const isActive = watch('isActive');
-  const isDefault = watch('isDefault');
+  const isActive = useWatch({ control, name: 'isActive' });
+  const isDefault = useWatch({ control, name: 'isDefault' });
 
   async function onSubmit(data: TaxRateFormValues) {
     setIsSubmitting(true);
@@ -74,8 +74,9 @@ export function TaxRateForm({ initialData }: TaxRateFormProps) {
       }
       setOpen(false);
       if (!isEditing) reset();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save tax rate');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Failed to save tax rate');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,8 +94,9 @@ export function TaxRateForm({ initialData }: TaxRateFormProps) {
       await deleteTaxRate(initialData.id);
       toast.success('Tax rate deleted');
       setOpen(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete tax rate');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Failed to delete tax rate');
     } finally {
       setIsSubmitting(false);
     }

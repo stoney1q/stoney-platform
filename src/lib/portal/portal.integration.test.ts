@@ -15,13 +15,11 @@ vi.mock('./auth', async (importOriginal) => {
     ...actual,
     signPortalToken: vi.fn().mockResolvedValue('mock-jwt'),
     setPortalCookie: vi.fn(),
-    verifyPortalCookie: vi
-      .fn()
-      .mockResolvedValue({
-        portalToken: 'test-token',
-        type: 'QUOTATION',
-        documentId: 'test-quotation-id',
-      }),
+    verifyPortalCookie: vi.fn().mockResolvedValue({
+      portalToken: 'test-token',
+      type: 'QUOTATION',
+      documentId: 'test-quotation-id',
+    }),
   };
 });
 
@@ -121,7 +119,9 @@ describe('Portal Integration', () => {
       };
 
       vi.spyOn(prisma.quotation, 'findUnique').mockResolvedValue(
-        mockQuotation as any
+        mockQuotation as unknown as Awaited<
+          ReturnType<typeof prisma.quotation.findUnique>
+        >
       );
 
       const res = await verifyPortalAccess('test-token', '(555) 123-4567');
@@ -137,7 +137,9 @@ describe('Portal Integration', () => {
       };
 
       vi.spyOn(prisma.quotation, 'findUnique').mockResolvedValue(
-        mockQuotation as any
+        mockQuotation as unknown as Awaited<
+          ReturnType<typeof prisma.quotation.findUnique>
+        >
       );
 
       // Providing an empty string, or whitespace, or just symbols should NOT authenticate
@@ -164,7 +166,9 @@ describe('Portal Integration', () => {
       };
 
       vi.spyOn(prisma.quotation, 'findUnique').mockResolvedValue(
-        mockQuotation as any
+        mockQuotation as unknown as Awaited<
+          ReturnType<typeof prisma.quotation.findUnique>
+        >
       );
 
       // Simulate Prisma P2025 error on update
@@ -177,9 +181,13 @@ describe('Portal Integration', () => {
       );
 
       const mockUpdate = vi.fn().mockRejectedValue(prismaError);
-      vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
-        return cb({ quotation: { update: mockUpdate } });
-      });
+      vi.spyOn(prisma, '$transaction').mockImplementation(
+        async (cb: unknown) => {
+          return (cb as (tx: Prisma.TransactionClient) => Promise<unknown>)({
+            quotation: { update: mockUpdate },
+          } as unknown as Prisma.TransactionClient);
+        }
+      );
 
       await expect(customerAcceptQuotation('test-token', 1)).rejects.toThrow(
         'DOCUMENT_MODIFIED'

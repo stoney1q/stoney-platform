@@ -2,12 +2,7 @@ import { describe, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import * as assert from 'node:assert';
 import { POST } from './route';
 import { NextRequest } from 'next/server';
-import {
-  SaleStatus,
-  PaymentMethod,
-  MovementType,
-  Prisma,
-} from '@/generated/prisma/client';
+import { SaleStatus, PaymentMethod, Prisma } from '@/generated/prisma/client';
 
 const { currentMockCookie, testFirebaseUid, testEmail } = vi.hoisted(() => {
   const ts = Date.now();
@@ -30,6 +25,13 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
+  getFirebaseAdminStorage: () => ({
+    bucket: () => ({
+      file: () => ({
+        save: async () => {},
+      }),
+    }),
+  }),
   isFirebaseAdminConfigured: () => true,
   getFirebaseAdminAuth: () => ({
     verifySessionCookie: async () => {
@@ -158,17 +160,23 @@ describe('Mobile API - Sales Returns', async () => {
     });
     try {
       await prisma.role.deleteMany({ where: { name: 'Test Cashier API' } });
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
     try {
       await prisma.product.deleteMany({
         where: { id: product1Id },
       });
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
     try {
       await prisma.branch.deleteMany({
         where: { id: mainBranchId },
       });
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
   });
 
   beforeEach(async () => {

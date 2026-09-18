@@ -163,7 +163,7 @@ export function ActiveAuditInterface({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {audit.items.map((item: any) => (
+                {audit.items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
                       {item.product.sku}

@@ -8,7 +8,6 @@ import {
   completeAudit,
   updateAuditStatus,
 } from '@/lib/inventory/audit-actions';
-import { SafeStockAuditItemDTO } from '@/lib/inventory/dtos';
 import {
   Table,
   TableBody,
@@ -101,7 +100,7 @@ export function ReviewAuditInterface({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {audit.items.map((item: SafeStockAuditItemDTO) => {
+                {audit.items.map((item) => {
                   const expectedVariance =
                     item.countedQuantity - item.systemQuantity;
 
@@ -125,9 +124,9 @@ export function ReviewAuditInterface({
                       </TableCell>
                       {audit.status === 'COMPLETED' && (
                         <TableCell
-                          className={`text-right font-bold ${item.variance < 0 ? 'text-red-500' : item.variance > 0 ? 'text-green-500' : 'text-muted-foreground'}`}
+                          className={`text-right font-bold ${item.variance! < 0 ? 'text-red-500' : item.variance! > 0 ? 'text-green-500' : 'text-muted-foreground'}`}
                         >
-                          {item.variance > 0 ? '+' : ''}
+                          {item.variance! > 0 ? '+' : ''}
                           {item.variance}
                         </TableCell>
                       )}
@@ -150,10 +149,11 @@ export function ReviewAuditInterface({
 
           {audit.status === 'REVIEW' && (
             <p className="text-muted-foreground mt-4 text-xs">
-              * The "Expected Variance" is based on the system snapshot at the
-              time the audit was created. The actual applied variance will be
-              calculated exactly at the moment of approval against live stock to
-              account for any concurrent sales or receipts.
+              * The &quot;Expected Variance&quot; is based on the system
+              snapshot at the time the audit was created. The actual applied
+              variance will be calculated exactly at the moment of approval
+              against live stock to account for any concurrent sales or
+              receipts.
             </p>
           )}
         </CardContent>

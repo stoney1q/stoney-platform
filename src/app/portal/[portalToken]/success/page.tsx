@@ -1,7 +1,5 @@
 import { getPortalDocument } from '@/lib/portal/actions';
 import { verifyTransaction } from '@/lib/paystack/client';
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@/generated/prisma/client';
 
 export default async function PortalSuccessPage({
   params,

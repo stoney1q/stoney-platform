@@ -44,13 +44,22 @@ Every major feature must be implemented as a **loop** — a bounded engineering 
                     ACCEPTANCE TEST
                            │
                            ▼
-                      DOCUMENT
-                           │
-                           ▼
-                    GIT CHECKPOINT
-                           │
-                           ▼
-                     LOOP COMPLETE
+                       DOCUMENT
+                            │
+                            ▼
+                   FINAL VERIFICATION
+                            │
+                            ▼
+                     HUMAN APPROVAL
+                            │
+                            ▼
+                     GIT CHECKPOINT
+                            │
+                            ▼
+                          PUSH
+                            │
+                            ▼
+                      LOOP COMPLETE
 ```
 
 No loop is complete until its acceptance criteria and quality gates pass.
@@ -113,10 +122,10 @@ QUALITY REVIEW
    ↓
 DOCUMENT
    ↓
-GIT CHECKPOINT
-   ↓
-ACCEPT
+FINAL VERIFICATION
 ```
+
+The engineering loop ends at Final Verification. Git Checkpoint and Push are performed in a separate, human-approved phase.
 
 ---
 
@@ -206,9 +215,33 @@ Documentation must describe the implementation that actually exists.
 
 ---
 
-## Git Gate
+## Final Verification Gate
 
-Before committing:
+Before the engineering loop can be considered finished, the agent must perform a final verification to confirm:
+
+- intended scope is complete
+- security boundaries remain intact
+- tests pass
+- TypeScript passes
+- lint passes or documented pre-existing issues are clearly separated
+- production build passes
+- database/migration safety is verified where applicable
+- no secrets/debug/scratch artifacts are included
+- acceptance criteria are satisfied
+
+After FINAL VERIFICATION, the agent **MUST STOP** and report exactly:
+`LOOP XX VERIFIED — READY FOR GIT CHECKPOINT`
+or
+`LOOP XX VERIFICATION BLOCKED`
+
+---
+
+## Git Gate (Human-Approved Phase)
+
+**The agent MUST NOT commit or push autonomously after implementation or verification.**
+Git checkpoint/release is a separate, human-approved phase performed _only_ after the user reviews the final verification result.
+
+When explicitly instructed by the user to perform the Git Checkpoint, run:
 
 ```bash
 git status
@@ -239,7 +272,7 @@ Never push known-broken code.
 
 ## Definition of Done
 
-A loop is DONE only when:
+An engineering loop is READY FOR GIT CHECKPOINT only when:
 
 - [ ] Objective implemented
 - [ ] Scope respected
@@ -252,9 +285,10 @@ A loop is DONE only when:
 - [ ] Tests pass
 - [ ] Build passes
 - [ ] Documentation updated
-- [ ] Git diff reviewed
-- [ ] Focused commit created
+- [ ] Final Verification passed and reported
 - [ ] No known critical issues remain
+
+The loop is completely DONE only after Human Approval → Git Checkpoint → Push.
 
 ---
 
