@@ -8,6 +8,7 @@ import {
   setPortalCookie,
   verifyPortalCookie,
 } from './auth';
+import { logger } from '@/lib/observability/logger';
 import { headers } from 'next/headers';
 import { QuotationStatus, Prisma } from '@/generated/prisma/client';
 
@@ -120,7 +121,7 @@ export async function verifyPortalAccess(
       message: 'If the details match, you will be granted access.',
     };
   } catch (error) {
-    console.error('[PORTAL] Error in verifyPortalAccess:', error);
+    logger.error('Error in verifyPortalAccess', error);
     return {
       success: true,
       message: 'If the details match, you will be granted access.',

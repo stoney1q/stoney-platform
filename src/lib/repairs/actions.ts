@@ -20,6 +20,7 @@ import {
 } from './validation';
 import { RepairStatus, MovementType, Prisma } from '@/generated/prisma/client';
 import { storage } from '../media/storage';
+import { logger } from '@/lib/observability/logger';
 import {
   generateDocumentNumber,
   buildSnapshotData,
@@ -147,7 +148,9 @@ export async function updateRepairStatus(formData: FormData) {
     after(async () => {
       const { generateDocumentPdf } =
         await import('@/lib/documents/pdf-generator');
-      generateDocumentPdf(data.repairId, 'REPAIR').catch(console.error);
+      generateDocumentPdf(data.repairId, 'REPAIR').catch((e) =>
+        logger.error('Background PDF generation failed', e)
+      );
     });
   }
 
@@ -723,7 +726,7 @@ export async function deleteRepair(repairId: string, version: number) {
     try {
       await storage.deleteObject(asset.path);
     } catch (e) {
-      console.error('Failed to delete GCS object during repair deletion:', e);
+      logger.error('Failed to delete GCS object during repair deletion', e);
     }
   }
 

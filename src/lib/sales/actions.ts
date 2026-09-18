@@ -35,6 +35,7 @@ import {
   generateDocumentNumber,
   buildSnapshotData,
 } from '@/lib/documents/actions';
+import { logger } from '@/lib/observability/logger';
 import { after } from 'next/server';
 
 export async function searchSales(options: {
@@ -491,7 +492,9 @@ export async function applyPayment(formData: FormData) {
     after(async () => {
       const { generateDocumentPdf } =
         await import('@/lib/documents/pdf-generator');
-      generateDocumentPdf(result.saleId, 'SALE').catch(console.error);
+      generateDocumentPdf(result.saleId, 'SALE').catch((e) =>
+        logger.error('Background PDF generation failed', e)
+      );
     });
   }
 }

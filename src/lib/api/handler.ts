@@ -3,6 +3,8 @@ import { ZodError } from 'zod';
 import { AuthError } from '@/lib/auth/guard';
 import { checkRateLimit } from './rate-limit';
 
+import { logger } from '@/lib/observability/logger';
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*', // Adjust for production if needed
@@ -24,7 +26,10 @@ export function apiHandler(handler: ApiHandler) {
 
     try {
       // 1. Rate Limiting
-      const ip = req.headers.get('x-forwarded-for') || (req as unknown as { ip?: string }).ip || 'anonymous';
+      const ip =
+        req.headers.get('x-forwarded-for') ||
+        (req as unknown as { ip?: string }).ip ||
+        'anonymous';
 
       // Limit to 100 requests per minute per IP
       const isAllowed = checkRateLimit(ip, 100, 60000);
@@ -43,9 +48,11 @@ export function apiHandler(handler: ApiHandler) {
         response.headers.set(key, value);
       });
       return response;
-
     } catch (error: unknown) {
-      console.error('[API Error]', error);
+      logger.error('API Request Failed', error, {
+        path: req.nextUrl.pathname,
+        method: req.method,
+      });
 
       // 3. Error Mapping
       if (error instanceof AuthError) {
@@ -57,13 +64,23 @@ export function apiHandler(handler: ApiHandler) {
 
       if (error instanceof ZodError) {
         return NextResponse.json(
-          { error: 'Validation failed', details: (error as unknown as { errors?: unknown[], issues?: unknown[] }).errors || error.issues },
+          {
+            error: 'Validation failed',
+            details:
+              (error as unknown as { errors?: unknown[]; issues?: unknown[] })
+                .errors || error.issues,
+          },
           { status: 400, headers: corsHeaders }
         );
       }
 
       // Handle Prisma errors like "Record not found" or "Unique constraint"
-      if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof error.code === 'string'
+      ) {
         if (error.code === 'P2025') {
           return NextResponse.json(
             { error: 'Record not found' },
@@ -72,7 +89,10 @@ export function apiHandler(handler: ApiHandler) {
         }
         if (error.code === 'P2002') {
           return NextResponse.json(
-            { error: 'Unique constraint violation. A record with this value already exists.' },
+            {
+              error:
+                'Unique constraint violation. A record with this value already exists.',
+            },
             { status: 409, headers: corsHeaders }
           );
         }

@@ -10,6 +10,7 @@ import { emailDocumentSchema, crossBranchLookupSchema } from './validation';
 import { storage } from '@/lib/media/storage';
 import { after } from 'next/server';
 import { Prisma } from '@/generated/prisma/client';
+import { logger } from '@/lib/observability/logger';
 
 export async function buildSnapshotData(
   branchId: string,
@@ -242,7 +243,9 @@ export async function regenerateDocumentPdfAction(formData: FormData) {
   // Trigger PDF generation in the background
   after(async () => {
     const { generateDocumentPdf } = await import('./pdf-generator');
-    generateDocumentPdf(documentId, type).catch(console.error);
+    generateDocumentPdf(documentId, type).catch((e) =>
+      logger.error('Background PDF generation failed', e)
+    );
   });
 }
 

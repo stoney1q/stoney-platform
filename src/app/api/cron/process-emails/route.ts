@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendDocumentEmail } from '@/lib/documents/email';
 import { storage } from '@/lib/media/storage';
 import crypto from 'crypto';
+import { logger } from '@/lib/observability/logger';
 
 export const maxDuration = 60; // Max execution time for Vercel Hobby/Pro
 export const dynamic = 'force-dynamic';
@@ -106,7 +107,9 @@ export async function GET(request: Request) {
           results.sent++;
         } catch (error: unknown) {
           // Log the failure in the database securely
-          console.error(`Failed to process delivery log ${log.id}:`, error);
+          logger.error('Failed to process delivery log', error, {
+            logId: log.id,
+          });
 
           // Check if we should retry (transient errors within 1 hour)
           const isTransient =
@@ -152,7 +155,7 @@ export async function GET(request: Request) {
       ...results,
     });
   } catch (error: unknown) {
-    console.error('Fatal cron error:', error);
+    logger.error('Fatal cron error', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

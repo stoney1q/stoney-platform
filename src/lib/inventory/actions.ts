@@ -14,6 +14,7 @@ import {
   Prisma,
 } from '../../generated/prisma/client';
 import { storage } from '../media/storage';
+import { logger } from '@/lib/observability/logger';
 import { receiveStockSchema, adjustStockSchema } from './validation';
 
 /**
@@ -430,7 +431,7 @@ export async function deleteProduct(productId: string) {
     try {
       await storage.deleteObject(asset.path);
     } catch (e) {
-      console.error('Failed to delete GCS object during product deletion:', e);
+      logger.error('Failed to delete GCS object during product deletion', e);
     }
   }
 

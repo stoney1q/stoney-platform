@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
 import { Prisma } from '@/generated/prisma/client';
 import { initializeTransaction } from './client';
 import { headers } from 'next/headers';
@@ -68,9 +69,9 @@ export async function createPaystackCheckoutSession(portalToken: string) {
     };
   } catch (error: unknown) {
     if (error instanceof Error) {
-      console.error('Paystack initialize error:', error.message);
+      logger.error('Paystack initialize error', error);
     } else {
-      console.error('Paystack initialize error:', error);
+      logger.error('Paystack initialize error', error);
     }
     throw new Error('Failed to initialize online payment.');
   }

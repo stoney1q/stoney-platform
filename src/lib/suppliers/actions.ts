@@ -7,10 +7,11 @@ import {
   linkProductSupplierSchema,
 } from './validation';
 import * as service from './service';
+import { logger } from '@/lib/observability/logger';
 
 function handleActionError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error('Supplier action error:', message);
+  logger.error('Supplier action error', error);
   return { success: false as const, error: message, data: undefined };
 }
 
