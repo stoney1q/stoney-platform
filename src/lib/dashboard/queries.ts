@@ -294,6 +294,7 @@ export interface PaymentBreakdownDTO {
   cash: string;
   card: string;
   transfer: string;
+  paystack: string;
   other: string;
   total: string;
 }
@@ -327,6 +328,7 @@ export async function getPaymentBreakdown(): Promise<PaymentBreakdownDTO> {
   let cash = new Prisma.Decimal(0);
   let card = new Prisma.Decimal(0);
   let transfer = new Prisma.Decimal(0);
+  let paystack = new Prisma.Decimal(0);
   let other = new Prisma.Decimal(0);
 
   for (const p of payments) {
@@ -334,15 +336,18 @@ export async function getPaymentBreakdown(): Promise<PaymentBreakdownDTO> {
     else if (p.method === PaymentMethod.CARD) card = card.add(p.amount);
     else if (p.method === PaymentMethod.TRANSFER)
       transfer = transfer.add(p.amount);
+    else if (p.method === PaymentMethod.PAYSTACK)
+      paystack = paystack.add(p.amount);
     else other = other.add(p.amount);
   }
 
-  const total = cash.add(card).add(transfer).add(other);
+  const total = cash.add(card).add(transfer).add(paystack).add(other);
 
   return {
     cash: cash.toFixed(2),
     card: card.toFixed(2),
     transfer: transfer.toFixed(2),
+    paystack: paystack.toFixed(2),
     other: other.toFixed(2),
     total: total.toFixed(2),
   };

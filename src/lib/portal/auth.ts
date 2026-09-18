@@ -20,7 +20,7 @@ function getSecretKey(): Uint8Array {
 
 export async function signPortalToken(
   documentId: string,
-  type: 'QUOTATION' | 'REPAIR',
+  type: 'QUOTATION' | 'REPAIR' | 'SALE',
   portalToken: string
 ): Promise<string> {
   const secretKey = getSecretKey();

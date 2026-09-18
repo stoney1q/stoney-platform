@@ -43,7 +43,7 @@ export async function verifyPortalAccess(
   try {
     // 4. Find the document (Quotation or Repair)
     let documentId: string | null = null;
-    let documentType: 'QUOTATION' | 'REPAIR' | null = null;
+    let documentType: 'QUOTATION' | 'REPAIR' | 'SALE' | null = null;
     let customer: { email: string | null; phone: string | null } | null = null;
 
     const quotation = await prisma.quotation.findUnique({
@@ -64,6 +64,16 @@ export async function verifyPortalAccess(
         documentId = repair.id;
         documentType = 'REPAIR';
         customer = repair.customer;
+      } else {
+        const sale = await prisma.sale.findUnique({
+          where: { portalToken },
+          include: { customer: true },
+        });
+        if (sale) {
+          documentId = sale.id;
+          documentType = 'SALE';
+          customer = sale.customer;
+        }
       }
     }
 
@@ -179,6 +189,42 @@ export async function getPortalDocument(portalToken: string) {
       },
     });
     return { type: 'REPAIR', document: repair };
+  } else if (payload.type === 'SALE') {
+    const sale = await prisma.sale.findUnique({
+      where: { id: payload.documentId as string },
+      select: {
+        id: true,
+        documentNumber: true,
+        status: true,
+        subtotal: true,
+        taxAmount: true,
+        total: true,
+        discount: true,
+        version: true,
+        createdAt: true,
+        branch: { select: { name: true, phone: true, email: true } },
+        customer: { select: { firstName: true, lastName: true } },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            discount: true,
+            total: true,
+            product: { select: { name: true, sku: true } },
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            method: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    return { type: 'SALE', document: sale };
   }
 
   throw new Error('Invalid document type');
