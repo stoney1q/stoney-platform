@@ -1,4 +1,4 @@
-﻿import {
+import {
   getPaymentBreakdown,
   PaymentBreakdownDTO,
 } from '@/lib/dashboard/queries';
@@ -104,6 +104,14 @@ export async function PaymentBreakdownWidget() {
                 currencySymbol={currencySymbol}
                 colorClass="text-purple-600 dark:text-purple-400"
               />
+              {parseFloat(breakdown.paystack) > 0 && (
+                <BreakdownRow
+                  label="Paystack (Online)"
+                  amount={breakdown.paystack}
+                  currencySymbol={currencySymbol}
+                  colorClass="text-indigo-600 dark:text-indigo-400"
+                />
+              )}
               {parseFloat(breakdown.other) > 0 && (
                 <BreakdownRow
                   label="Other"
