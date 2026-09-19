@@ -7,12 +7,32 @@ import {
 import { getCurrentUser } from '@/lib/auth/guard';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE } from '@/lib/auth/types';
 import prisma from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const AUTH_LIMIT_MAX = 10;
+const AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
  * POST /api/auth/session
  * Exchanging a verified Firebase ID token for an HTTP-only session cookie.
  */
 export async function POST(request: Request) {
+  // IP-based Rate Limiting
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  const ip = forwardedFor ? forwardedFor.split(',')[0] : '127.0.0.1';
+  const ipKey = `auth:session:ip:${ip}`;
+
+  const rateLimit = await checkRateLimit(
+    ipKey,
+    AUTH_LIMIT_MAX,
+    AUTH_LIMIT_WINDOW_MS
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many authentication attempts. Please try again later.' },
+      { status: 429 }
+    );
+  }
   if (!isFirebaseAdminConfigured()) {
     return NextResponse.json(
       { error: 'Firebase Admin credentials are not configured on the server.' },

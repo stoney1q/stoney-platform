@@ -5,11 +5,13 @@ export default async function PortalSuccessPage({
   params,
   searchParams,
 }: {
-  params: { portalToken: string };
-  searchParams: { reference?: string; trxref?: string };
+  params: Promise<{ portalToken: string }>;
+  searchParams: Promise<{ reference?: string; trxref?: string }>;
 }) {
-  const { portalToken } = params;
-  const reference = searchParams.reference || searchParams.trxref;
+  const { portalToken } = await params;
+  const resolvedSearchParams = await searchParams;
+  const reference =
+    resolvedSearchParams.reference || resolvedSearchParams.trxref;
 
   // We fetch the document just to ensure they are authenticated
   const data = await getPortalDocument(portalToken);

@@ -27,7 +27,7 @@ export async function verifyPortalAccess(
   const ip = forwardedFor ? forwardedFor.split(',')[0] : '127.0.0.1';
 
   // 2. Check rate limits (both IP and Token)
-  const isAllowed = checkPortalRateLimit(ip, portalToken);
+  const isAllowed = await checkPortalRateLimit(ip, portalToken);
   if (!isAllowed) {
     // If rate limited, return a generic message anyway to not leak that it's blocked,
     // but internally we don't issue a cookie.

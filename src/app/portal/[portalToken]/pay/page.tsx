@@ -5,9 +5,9 @@ import { redirect } from 'next/navigation';
 export default async function PortalPaymentPage({
   params,
 }: {
-  params: { portalToken: string };
+  params: Promise<{ portalToken: string }>;
 }) {
-  const { portalToken } = params;
+  const { portalToken } = await params;
 
   // We fetch the document to display a summary.
   // getPortalDocument verifies the JWT cookie.
