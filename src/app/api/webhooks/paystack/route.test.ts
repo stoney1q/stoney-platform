@@ -22,6 +22,10 @@ vi.mock('@/lib/paystack/client', () => ({
   verifyWebhookSignature: vi.fn(),
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 describe('Paystack Webhook POST', () => {
   beforeEach(() => {
     vi.clearAllMocks();

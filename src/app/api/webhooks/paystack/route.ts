@@ -3,8 +3,26 @@ import { verifyWebhookSignature } from '@/lib/paystack/client';
 import { prisma } from '@/lib/prisma';
 import { Prisma, PaymentMethod } from '@/generated/prisma/client';
 import { logger } from '@/lib/observability/logger';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const WEBHOOK_LIMIT_MAX = 100;
+const WEBHOOK_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
 export async function POST(req: Request) {
+  // IP-based Rate Limiting (Protects against DB flood via invalid signatures)
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const ip = forwardedFor ? forwardedFor.split(',')[0] : '127.0.0.1';
+  const ipKey = `webhook:paystack:ip:${ip}`;
+
+  const rateLimit = await checkRateLimit(
+    ipKey,
+    WEBHOOK_LIMIT_MAX,
+    WEBHOOK_LIMIT_WINDOW_MS
+  );
+  if (!rateLimit.allowed) {
+    logger.warn('Paystack Webhook Rate Limit Exceeded', { ip });
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
   try {
     const signature = req.headers.get('x-paystack-signature');
 

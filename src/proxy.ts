@@ -20,6 +20,7 @@ const PUBLIC_ROUTES: RegExp[] = [
   /^\/login(\/.*)?$/,
   /^\/forgot-password(\/.*)?$/,
   /^\/api\/auth(\/.*)?$/,
+  /^\/portal(\/.*)?$/,
 ];
 
 /**

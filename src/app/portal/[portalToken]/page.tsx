@@ -42,9 +42,9 @@ type PortalDoc = {
 export default async function PortalPage({
   params,
 }: {
-  params: { portalToken: string };
+  params: Promise<{ portalToken: string }>;
 }) {
-  const { portalToken } = params;
+  const { portalToken } = await params;
 
   // 1. Check if authenticated
   const payload = await verifyPortalCookie();

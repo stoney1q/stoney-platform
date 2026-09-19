@@ -895,3 +895,16 @@ model EmailDeliveryLog {
   @@index([status, createdAt])
   @@index([status, updatedAt])
 }
+
+// ==========================================
+// SECURITY & OBSERVABILITY DOMAIN
+// ==========================================
+
+model RateLimit {
+  key       String   @id
+  points    Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
