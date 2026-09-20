@@ -24,10 +24,23 @@ export default async function globalTeardown() {
     return;
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
+  // Only use TEST_DATABASE_URL for safety. Never use production DATABASE_URL.
+  const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.error(
-      '[E2E globalTeardown] DATABASE_URL not set — cannot clean up!'
+      '[E2E globalTeardown] DATABASE_URL or TEST_DATABASE_URL not set — cannot clean up!'
+    );
+    return;
+  }
+
+  // Safety check: Prevent running teardown against external non-test databases.
+  if (
+    !process.env.TEST_DATABASE_URL &&
+    !databaseUrl.includes('localhost') &&
+    !databaseUrl.includes('127.0.0.1')
+  ) {
+    console.error(
+      '[E2E globalTeardown] ABORTED: DATABASE_URL appears to be a remote/production database.'
     );
     return;
   }

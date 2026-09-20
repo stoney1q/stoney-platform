@@ -34,8 +34,6 @@ test.describe('Customer Portal', () => {
 
     // The portal should show a verification prompt (email/phone entry)
     // before revealing quotation details
-    const bodyText = await page.content();
-
     // It should NOT immediately show the quotation document
     // (verification step should appear first)
     await expect(

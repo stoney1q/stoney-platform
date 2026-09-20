@@ -13,6 +13,8 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   onIdTokenChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import {
@@ -35,6 +37,7 @@ interface AuthContextType {
     email: string
   ) => Promise<{ ok: boolean; error?: string }>;
   refreshUser: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -173,6 +176,63 @@ export function AuthProvider({
     }
   };
 
+  const signInWithGoogle = async () => {
+    setError(null);
+    if (!isFirebaseClientConfigured()) {
+      const errMsg =
+        'Firebase client is not configured. Please set NEXT_PUBLIC_FIREBASE_* environment variables.';
+      setError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+
+    try {
+      const auth = getFirebaseClientAuth();
+      const provider = new GoogleAuthProvider();
+      // Optionally restrict to hosted domain here if needed:
+      // provider.setCustomParameters({ hd: 'stoney.com' });
+
+      const credential = await signInWithPopup(auth, provider);
+      const idToken = await credential.user.getIdToken();
+
+      const sessionRes = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const sessionData = await sessionRes.json();
+
+      if (!sessionRes.ok) {
+        const errMsg =
+          sessionData.error || 'Failed to establish application session';
+        setError(errMsg);
+        await firebaseSignOut(auth);
+        return { ok: false, error: errMsg };
+      }
+
+      startTransition(() => {
+        setUser(sessionData.user);
+        setFirebaseUser(credential.user);
+      });
+
+      return { ok: true };
+    } catch (err: unknown) {
+      let errMsg = 'Failed to sign in with Google. Please try again.';
+      if (err instanceof Error) {
+        if (
+          err.message.includes('auth/popup-closed-by-user') ||
+          err.message.includes('auth/cancelled-popup-request')
+        ) {
+          errMsg = 'Sign in was cancelled.';
+        } else {
+          errMsg = err.message;
+        }
+      }
+      setError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+  };
+
   const signOut = async () => {
     try {
       if (isFirebaseClientConfigured()) {
@@ -211,6 +271,7 @@ export function AuthProvider({
         isLoading,
         error,
         signIn,
+        signInWithGoogle,
         signOut,
         sendPasswordReset,
         refreshUser,

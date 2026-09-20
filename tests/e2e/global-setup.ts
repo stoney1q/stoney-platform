@@ -28,10 +28,24 @@ const SEED_BRANCH_CODE_PREFIX = 'E2E-BRANCH-';
 import { E2EState, STATE_FILE } from './state';
 
 export default async function globalSetup(_config: FullConfig) {
-  // Only use direct DATABASE_URL for the Neon serverless connection from Node
-  const databaseUrl = process.env.DATABASE_URL;
+  // Only use TEST_DATABASE_URL for safety. Never use production DATABASE_URL.
+  const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL must be set for E2E globalSetup');
+    throw new Error('DATABASE_URL or TEST_DATABASE_URL must be set for E2E globalSetup');
+  }
+
+  // Safety check: Prevent running tests against external non-test databases.
+  if (
+    !process.env.TEST_DATABASE_URL &&
+    !databaseUrl.includes('localhost') &&
+    !databaseUrl.includes('127.0.0.1')
+  ) {
+    throw new Error(
+      'PLAYWRIGHT ABORTED: DATABASE_URL appears to be a remote/production database. ' +
+      'To run E2E tests locally, you MUST set TEST_DATABASE_URL in your .env ' +
+      'pointing to an isolated test database.'
+    );
   }
 
   // PrismaClient using PrismaNeon adapter (required for Neon serverless databases)

@@ -68,11 +68,21 @@ export async function POST(request: Request) {
       });
 
       if (userByEmail && !userByEmail.firebaseUid) {
+        if (!decodedToken.email_verified) {
+          return NextResponse.json(
+            {
+              error: 'Email address must be verified to link to an existing account. Please verify your email or use a trusted provider.',
+              code: 'UNVERIFIED_EMAIL',
+            },
+            { status: 403 }
+          );
+        }
+
         dbUser = await prisma.user.update({
           where: { id: userByEmail.id },
           data: {
             firebaseUid,
-            emailVerified: Boolean(decodedToken.email_verified),
+            emailVerified: true,
           },
         });
       }
