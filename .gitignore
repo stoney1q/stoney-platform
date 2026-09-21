@@ -29,3 +29,10 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Test outputs and Agent Artifacts
+playwright-report/
+test-results/
+lint_results.*
+tsc_results.txt
+*.tsbuildinfo
